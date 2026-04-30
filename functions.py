@@ -67,8 +67,8 @@ def build_mobility_cmd(vx, vy=0.0, yaw_rate=0.0, hold_time=0.3, acc=0.2):
 def move_forward_distance_smooth(
     robot,
     distance_m,
-    max_speed=0.3,       # 0.3m/s
-    accel=0.1,           # m/s^2, 작을수록 천천히 가속
+    max_speed=0.5,       # 0.3m/s
+    accel=0.2,           # m/s^2, 작을수록 천천히 가속
     tolerance=0.01,
     dt=0.02              # 50 Hz
 ):
@@ -190,9 +190,9 @@ def normalize_angle(angle):
 def rotate_inplace_smooth(
     robot,
     target_deg=90,
-    max_yaw_rate=0.1,
-    min_yaw_rate=0.01,
-    accel=0.02,
+    max_yaw_rate=0.3,
+    min_yaw_rate=0.05,
+    accel=0.1,
     tolerance_deg=1.0,
     dt=0.02
 ):
