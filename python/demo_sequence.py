@@ -4,14 +4,15 @@ import time
 import numpy as np
 import functions as fn
 
+init_distance_offset = 0.019
 distance_1st_table = 0.45
-distance_2nd_table = 0.3
+distance_2nd_table = 0.32
 distance_btw_1st_2nd_table = 2.5
 z_1st_table_down  = -0.1
 z_1st_table_up    = 0.22
 z_2nd_table_down  = -0.06
 z_2nd_table_up    = 0.06
-collect_box_Y     = 0.13
+collect_box_Y     = 0.12
 
 # Before run this file, run the "initialize.py" file
 # ----- Connect -------------------------------------------------------------------#
@@ -129,6 +130,15 @@ fn.move_arm_globalpos_both(robot, pos_delta_from_torso_R, pos_delta_from_torso_L
 time.sleep(1)
 
 
+# ----- Pull the block close to torso ----------------------------
+x_pull = 0.18 - x_delta_robot
+y_pull = -0.12 - y_delta_robot
+pos_delta_from_torso_R = [0.0, 0.0, 0.0]
+pos_delta_from_torso_L = [x_pull, y_pull, 0.0]
+fn.move_arm_globalpos_both(robot, pos_delta_from_torso_R, pos_delta_from_torso_L)
+time.sleep(1)
+
+
 # ----- Go Backward from 1st Table --------------------------------------------------- #
 fn.move_forward_distance_smooth(robot, -distance_1st_table)         # Backward 30cm
 time.sleep(1)
@@ -182,7 +192,12 @@ time.sleep(1)
 
 
 # ----- Go Backward from 2nd Table --------------------------------------------------- #
-fn.move_forward_distance_smooth(robot, distance_2nd_table)         # Backward 30cm
+fn.move_forward_distance_smooth(robot, -distance_2nd_table)         # Backward 30cm
+time.sleep(1)
+
+
+# ----- Reset Posture -----------------------------------------------#
+fn.move_position(robot, Desired_Pos, minimum_time=3)
 time.sleep(1)
 
 
@@ -201,6 +216,9 @@ fn.rotate_inplace_smooth(robot, fn.TURN_RIGHT_90)                # Right turn 90
 time.sleep(1)
 
 
+# ----- Backward to OFFSET --------------------------------------------------- #
+fn.move_forward_distance_smooth(robot, -init_distance_offset)         # Forward 250cm
+time.sleep(1)
 
 
 
