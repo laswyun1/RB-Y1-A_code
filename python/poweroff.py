@@ -11,7 +11,11 @@ if not robot.connect():
     print("FAIL: Could not connect to robot")
     exit(1)
 else:
+    robot.set_tool_flange_output_voltage("right", 0)
+    robot.set_tool_flange_output_voltage("left", 0)
+    time.sleep(1)
     robot.disable_control_manager()
-    time.sleep(2)
     robot.power_off(".*")  
     print("SUCCESS: Power OFF the robot!!")
+    
+    

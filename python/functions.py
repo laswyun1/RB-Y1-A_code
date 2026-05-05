@@ -25,6 +25,8 @@ PACK_POS = {"torso":      np.deg2rad([0.0, 80.0, -140.0,   60.0, 0.0,   0.0]),
             "right_arm":  np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0, 105.0, 0.0]),
             "left_arm":   np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0, 105.0, 0.0])}
 
+TURN_RIGHT_90   = -83.5
+TURN_LEFT_90    = 83.5
 
 # --- Gripper ------------------------------------ # 
 PROTOCOL_VERSION = 2.0
@@ -32,6 +34,7 @@ BAUDRATE = 2000000
 DEVICE_NAME_GRIPPER = "/dev/rby1_gripper"
 
 ADDR_OPERATING_MODE     = 11                # 0: Current Control / 1: Velocity Control / 3: Position Control(default)
+ADDR_CURRENT_LIMIT      = 38                # 0 ~ 1193
 ADDR_TORQUE_ENABLE      = 64                # 0: Turn OFF(default) / 1: Turn ON
 ADDR_LED                = 65                # 0: Turn OFF(default) / 1: Turn ON
 ADDR_GOAL_CURRENT       = 102
@@ -50,12 +53,20 @@ DXL_MAX_POS_VALUE       = 4095
 RESOLUTION_TICKS_PER_REV    = 4096.0
 TWO_PI                      = 2.0 * np.pi
 RAD2DEG                     = 180.0 / np.pi
+CURRENT_LIMIT_MAX_A         = 3.2               # Unit: A
+CURRENT_LIMIT_MAX_RAW       = 1193              # Unit: 2.69mA
 
 R_DXL_ID                    = 0
 L_DXL_ID                    = 1
 
 is_init_finish              = False
 
+DEMO_GRIP_CURRENT_R         = 0.8
+DEMO_GRIP_CURRENT_L         = 0.6
+DEMO_LAY_CURRENT_R          = -0.04
+DEMO_LAY_CURRENT_L          = -0.008
+DEMO_ZEROING_CURRENT_L      = 0.008
+DEMO_LAY_CURRENT_END        = 0.0
 
 
 
@@ -109,8 +120,8 @@ def build_mobility_cmd(vx, vy=0.0, yaw_rate=0.0, hold_time=0.3, acc=0.2):
 def move_forward_distance_smooth(
     robot,
     distance_m,
-    max_speed=0.5,       # m/s
-    accel=0.2,           # m/s^2, 작을수록 천천히 가속
+    max_speed=0.3,       # m/s
+    accel=0.1,           # m/s^2, 작을수록 천천히 가속
     tolerance=0.01,
     dt=0.02              # 50 Hz
 ):
@@ -118,7 +129,15 @@ def move_forward_distance_smooth(
         angle=0.0,
         position=np.array([0.0, 0.0])
     )
-
+    # For skipping Move function due to malfunction of reset odometry
+    for i in range(20):
+        odom = robot.get_state().odometry
+        x = odom[0, 2]
+        y = odom[1, 2]
+        if np.sqrt(x*x + y*y) < 0.02:
+            break;
+        time.sleep(0.2)
+    
     direction = 1.0 if distance_m >= 0 else -1.0
     target = abs(distance_m)
     current_speed = 0.0
@@ -232,9 +251,9 @@ def normalize_angle(angle):
 def rotate_inplace_smooth(
     robot,
     target_deg=90,
-    max_yaw_rate=0.5,
-    min_yaw_rate=0.1,
-    accel=0.2,
+    max_yaw_rate=0.3,
+    min_yaw_rate=0.05,
+    accel=0.15,
     tolerance_deg=1.0,
     dt=0.02
 ):
@@ -1128,6 +1147,77 @@ def DXL_write_current_ampere(dxl_id: int, current_ampere: float, port_handler, p
         print(f"[DXL ID:{dxl_id}] SUCCESS: Set Current [{current_ampere} A]")
         
 
+# 1-unit = 2.69mA / Ensure the connection
+def DXL_write_current_ampere_safety(dxl_id: int, current_ampere: float, port_handler, packet_handler) -> None:        
+    current_value = int(current_ampere / 2.69 * 1000.0)
+    
+    while True:
+        dxl_comm_res, dxl_err = packet_handler.write2ByteTxRx(
+            port_handler,
+            dxl_id,
+            ADDR_GOAL_CURRENT,
+            current_value,
+        )
+        if dxl_comm_res != COMM_SUCCESS:
+            print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getTxRxResult(dxl_comm_res)))
+            time.sleep(1)
+        elif dxl_err != 0:
+            print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getRxPacketError(dxl_err)))
+            time.sleep(1)
+        else:
+            print(f"[DXL ID:{dxl_id}] SUCCESS: Set Current [{current_ampere} A]")
+            time.sleep(1)
+            break
+        print(f"[DXL ID]:{dxl_id} Retry...")
+        
+def DXL_current_control_smooth(dxl_id: int, port_handler, packet_handler, current_ampere_start=-0.03, current_ampere_end=0.0, sleep_time=1) -> None:
+    current_value_start = int(current_ampere_start / 2.69 * 1000.0)
+    current_value_end = int(current_ampere_end / 2.69 * 1000.0)
+    
+    state = 0
+    
+    if (state == 0):
+        while True:
+            dxl_comm_res, dxl_err = packet_handler.write2ByteTxRx(
+                port_handler,
+                dxl_id,
+                ADDR_GOAL_CURRENT,
+                current_value_start,
+            )
+            if dxl_comm_res != COMM_SUCCESS:
+                print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getTxRxResult(dxl_comm_res)))
+                time.sleep(1)
+            elif dxl_err != 0:
+                print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getRxPacketError(dxl_err)))
+                time.sleep(1)
+            else:
+                print(f"[DXL ID:{dxl_id}] SUCCESS: Set Starting Current [{current_ampere_start} A]")
+                state = 1
+                time.sleep(sleep_time)
+                break   
+            print(f"[DXL ID]:{dxl_id} Retry starting current...")
+            
+    elif (state == 1):
+        while True:
+            dxl_comm_res, dxl_err = packet_handler.write2ByteTxRx(
+                port_handler,
+                dxl_id,
+                ADDR_GOAL_CURRENT,
+                current_value_end,
+            )
+            if dxl_comm_res != COMM_SUCCESS:
+                print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getTxRxResult(dxl_comm_res)))
+                time.sleep(1)
+            elif dxl_err != 0:
+                print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getRxPacketError(dxl_err)))
+                time.sleep(1)
+            else:
+                print(f"[DXL ID:{dxl_id}] SUCCESS: Set End Current [{current_ampere_end} A]")
+                time.sleep(1)
+                break   
+            print(f"[DXL ID]:{dxl_id} Retry End current...")
+
+
 # 1-unit = 2.69mA
 def DXL_read_current_ampere(dxl_id: int, port_handler, packet_handler) -> None:        
     val, dxl_comm_res, dxl_err = packet_handler.read2ByteTxRx(
@@ -1145,3 +1235,43 @@ def DXL_read_current_ampere(dxl_id: int, port_handler, packet_handler) -> None:
         current_A = float(val) * 2.69 / 1000.0 
         print(f"[DXL ID:{dxl_id}] SUCCESS: current = {current_A}A")
         return current_A     # [A]
+    
+    
+# Range (0~1193)
+def DXL_read_current_limit(dxl_id: int, port_handler, packet_handler) -> None:        
+    val, dxl_comm_res, dxl_err = packet_handler.read2ByteTxRx(
+        port_handler,
+        dxl_id,
+        ADDR_CURRENT_LIMIT
+    )
+    if dxl_comm_res != COMM_SUCCESS:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getTxRxResult(dxl_comm_res)))
+        return None
+    elif dxl_err != 0:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getRxPacketError(dxl_err)))
+        return None
+    else:
+        current_limit_raw = val
+        current_limit_A   = float(val) * 2.69 / 1000.0
+        print(f"[DXL ID:{dxl_id}] SUCCESS: current_limit_raw(0~1193) = {current_limit_raw}, current_limit_A = {current_limit_A}A")
+        return current_limit_A     # [A]
+    
+
+# Range (0~1193)
+def DXL_write_current_limit(dxl_id: int, current_limit_A: float, port_handler, packet_handler) -> None:        
+    current_limit_raw = int(current_limit_A / 2.69 * 1000.0)
+    if  (current_limit_raw > 1193):     current_limit_raw = 1193
+
+    dxl_comm_res, dxl_err = packet_handler.write2ByteTxRx(
+        port_handler,
+        dxl_id,
+        ADDR_CURRENT_LIMIT,
+        current_limit_raw
+    )
+    if dxl_comm_res != COMM_SUCCESS:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getTxRxResult(dxl_comm_res)))
+    elif dxl_err != 0:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getRxPacketError(dxl_err)))
+    else:
+        print(f"SUCCESS: Set Current Limit: {current_limit_A}A")
+    
