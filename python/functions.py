@@ -1,6 +1,8 @@
 import rby1_sdk as rby
 import time
 import numpy as np
+from typing import Optional, List
+from dynamixel_sdk import COMM_SUCCESS
 
 
 ROBOT_ADDRESS = "192.168.30.1:50051"        # For Real Robot
@@ -11,13 +13,51 @@ ZERO_POS = {"torso":      np.deg2rad([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
              "right_arm": np.deg2rad([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
              "left_arm":  np.deg2rad([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])}
 
-READY_POS = {"torso":     np.deg2rad([0.0, 45.0, -90.0,   45.0, 0.0,  0.0]),
-            "right_arm":  np.deg2rad([0.0, -5.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
-            "left_arm":   np.deg2rad([0.0,  5.0,   0.0, -120.0, 0.0, 70.0, 0.0])}
+READY_POS = {"torso":      np.deg2rad([0.0, 45.0, -90.0,   45.0, 0.0,  0.0]),
+             "right_arm":  np.deg2rad([0.0, -5.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
+             "left_arm":   np.deg2rad([0.0,  5.0,   0.0, -120.0, 0.0, 70.0, 0.0])}
+
+READY_DEMO_POS = {"torso":      np.deg2rad([0.0, 45.0, -90.0,   45.0, 0.0,  0.0]),
+                  "right_arm":  np.deg2rad([0.0, -5.0,   0.0, -130.0, 0.0, 60.0, 90.0]),
+                  "left_arm":   np.deg2rad([0.0,  5.0,   0.0, -130.0, 0.0, 60.0, -90.0])}
 
 PACK_POS = {"torso":      np.deg2rad([0.0, 80.0, -140.0,   60.0, 0.0,   0.0]),
             "right_arm":  np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0, 105.0, 0.0]),
             "left_arm":   np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0, 105.0, 0.0])}
+
+
+# --- Gripper ------------------------------------ # 
+PROTOCOL_VERSION = 2.0
+BAUDRATE = 2000000
+DEVICE_NAME_GRIPPER = "/dev/rby1_gripper"
+
+ADDR_OPERATING_MODE     = 11                # 0: Current Control / 1: Velocity Control / 3: Position Control(default)
+ADDR_TORQUE_ENABLE      = 64                # 0: Turn OFF(default) / 1: Turn ON
+ADDR_LED                = 65                # 0: Turn OFF(default) / 1: Turn ON
+ADDR_GOAL_CURRENT       = 102
+ADDR_GOAL_POSITION      = 116   
+ADDR_PRESENT_CURRENT    = 126               # Unit: 2.69mA
+ADDR_PRESENT_POSITION   = 132               # Unit: 1-pulse(or Tick)
+
+CURRENT_CONTROL_MODE    = 0
+POSITION_CONTROL_MODE   = 3
+TORQUE_DISABLE          = 0
+TORQUE_ENABLE           = 1
+
+DXL_MIN_POS_VALUE       = 0
+DXL_MAX_POS_VALUE       = 4095
+
+RESOLUTION_TICKS_PER_REV    = 4096.0
+TWO_PI                      = 2.0 * np.pi
+RAD2DEG                     = 180.0 / np.pi
+
+R_DXL_ID                    = 0
+L_DXL_ID                    = 1
+
+is_init_finish              = False
+
+
+
 
 
 def move_position(robot, posture, minimum_time=10.0):
@@ -267,7 +307,7 @@ def rotate_inplace_smooth(
         
         
 # Moving arm (0: Right)
-def move_endeffector(robot, direction_ee, rel_delta_pose):
+def move_endeffector(robot, direction_ee, rel_delta_pos):
     dyn_model = robot.get_dynamics()
     dyn_state = dyn_model.make_state(["base", "link_torso_5", "ee_right", "ee_left"], robot.model().robot_joint_names)
     BASE_INDEX, LINK_TORSO_5_INDEX, EE_RIGHT_INDEX, EE_LEFT_INDEX = 0, 1, 2, 3
@@ -276,10 +316,14 @@ def move_endeffector(robot, direction_ee, rel_delta_pose):
     dyn_model.compute_forward_kinematics(dyn_state)     # FK
     
     T_delta = np.eye(4)
-    T_delta[0:3, 3] = rel_delta_pose
+    T_delta[0:3, 3] = rel_delta_pos
     
     if (direction_ee == RIGHT_END):
-        T_torso2ee = dyn_model.compute_transformation(dyn_state, LINK_TORSO_5_INDEX, EE_RIGHT_INDEX)
+        T_torso2ee = dyn_model.compute_transformation(
+            dyn_state, 
+            LINK_TORSO_5_INDEX, 
+            EE_RIGHT_INDEX
+        )
         ee_builder = (
             rby.CartesianCommandBuilder()
             .set_command_header(rby.CommandHeaderBuilder().set_control_hold_time(100))
@@ -295,7 +339,11 @@ def move_endeffector(robot, direction_ee, rel_delta_pose):
             )
         )
     elif (direction_ee == LEFT_END):
-        T_torso2ee = dyn_model.compute_transformation(dyn_state, LINK_TORSO_5_INDEX, EE_LEFT_INDEX)
+        T_torso2ee = dyn_model.compute_transformation(
+            dyn_state, 
+            LINK_TORSO_5_INDEX, 
+            EE_LEFT_INDEX
+        )
         ee_builder = (
             rby.CartesianCommandBuilder()
             .set_command_header(rby.CommandHeaderBuilder().set_control_hold_time(100))
@@ -312,3 +360,788 @@ def move_endeffector(robot, direction_ee, rel_delta_pose):
         )
 
     return None
+
+
+
+# rel_delta_pos: endeffector 기준 pos, R_torso_target: torso5 기준 ori
+# def move_to_firstblock(robot, direction_ee, rel_delta_pos, RPY_torso_target):
+#     dyn_model = robot.get_dynamics()
+#     dyn_state = dyn_model.make_state(["base", "link_torso_5", "ee_right", "ee_left"], robot.model().robot_joint_names)
+#     BASE_INDEX, LINK_TORSO_5_INDEX, EE_RIGHT_INDEX, EE_LEFT_INDEX = 0, 1, 2, 3
+    
+#     dyn_state.set_q(robot.get_state().position)         # Get current gc
+#     dyn_model.compute_forward_kinematics(dyn_state)     # FK
+    
+#     T_torso2ee_now = dyn_model.compute_transformation(
+#         dyn_state,
+#         LINK_TORSO_5_INDEX,
+#         EE_LEFT_INDEX
+#     )
+
+#     R_torso2ee_now = T_torso2ee_now[0:3, 0:3]
+#     p_torso2ee_now = T_torso2ee_now[0:3, 3]
+    
+#     p_delta_ee = np.array(rel_delta_pos)          # ee_left 기준 이동량
+#     p_delta_torso = R_torso2ee_now @ p_delta_ee   # torso5 기준으로 변환
+
+#     p_target = p_torso2ee_now + p_delta_torso
+#     R_target = rpy_to_rotmat(RPY_torso_target[0], RPY_torso_target[1], RPY_torso_target[2])
+    
+#     T_target = np.eye(4)
+#     T_target[0:3, 3] = p_target
+#     T_target[0:3, 0:3] = np.eye(3)
+    
+    
+#     ee_builder = (
+#         rby.CartesianCommandBuilder()
+#         .set_command_header(rby.CommandHeaderBuilder().set_control_hold_time(1))
+#         .set_minimum_time(3)
+#         .add_target("link_torso_5", "ee_left", T_target, 1.0, 1.0, 1.0)
+#         .add_joint_position_target(robot.model().robot_joint_names[robot.model().left_arm_idx[2]], 0)
+#     )
+    
+#     rc_builder = rby.RobotCommandBuilder().set_command(
+#         rby.ComponentBasedCommandBuilder()
+#         .set_body_command(
+#             rby.BodyComponentBasedCommandBuilder()
+#             .set_left_arm_command(ee_builder)
+#         )
+#     )
+    
+#     rc = robot.send_command(rc_builder).get()
+
+#     print("finish_code:", rc.finish_code)
+#     print("feedback:", rc)
+
+#     return rc.finish_code
+    
+    
+def rpy_to_rotmat(roll, pitch, yaw):
+    Rx = np.array([
+        [1,       0,            0      ],
+        [0, np.cos(roll), -np.sin(roll)],
+        [0, np.sin(roll),  np.cos(roll)]
+    ])
+
+    Ry = np.array([
+        [np.cos(pitch),  0, np.sin(pitch)],
+        [0,              1,       0      ],
+        [-np.sin(pitch), 0, np.cos(pitch)]
+    ])
+
+    Rz = np.array([
+        [np.cos(yaw), -np.sin(yaw), 0],
+        [np.sin(yaw),  np.cos(yaw), 0],
+        [0,                  0,     1]
+    ])
+
+    return Rz @ Ry @ Rx   # xyz convention
+
+
+# rel_delta_pos: end-effector 기준 position delta
+def move_arm_pos(robot, direction_ee, rel_delta_pos):
+    dyn_model = robot.get_dynamics()
+    model = robot.model()
+
+    dyn_state = dyn_model.make_state(
+        ["link_torso_5", "ee_right", "ee_left"],
+        model.robot_joint_names
+    )
+
+    LINK_TORSO_5_INDEX, EE_RIGHT_INDEX, EE_LEFT_INDEX = 0, 1, 2
+
+    dyn_state.set_q(robot.get_state().position)
+    dyn_model.compute_forward_kinematics(dyn_state)
+
+    # left arm 기준
+    if (direction_ee == RIGHT_END):
+        T_torso2ee = dyn_model.compute_transformation(
+            dyn_state,
+            LINK_TORSO_5_INDEX,
+            EE_RIGHT_INDEX
+        )
+    elif (direction_ee == LEFT_END):
+        T_torso2ee = dyn_model.compute_transformation(
+            dyn_state,
+            LINK_TORSO_5_INDEX,
+            EE_LEFT_INDEX
+        )
+
+    rotmat_torso2ee = T_torso2ee[0:3, 0:3]
+    pos_torso2ee = T_torso2ee[0:3, 3]
+
+    # ee기준 delta position을 torso5 기준으로 변환
+    pos_delta_ee = np.asarray(rel_delta_pos, dtype=float)
+    pos_delta_torso = rotmat_torso2ee @ pos_delta_ee
+
+    pos_target = pos_torso2ee + pos_delta_torso
+
+    # 자세는 현재 자세 유지
+    T_target = np.eye(4)
+    T_target[0:3, 3] = pos_target
+    T_target[0:3, 0:3] = rotmat_torso2ee
+
+    if (direction_ee == RIGHT_END):
+        ee_builder = (
+            rby.CartesianCommandBuilder()
+            .set_command_header(
+                rby.CommandHeaderBuilder().set_control_hold_time(3)
+            )
+            .set_minimum_time(3.0)
+            .add_target("link_torso_5", "ee_right", T_target, 1.0, 1.0, 1.0)
+            # .add_joint_position_target(robot.model().robot_joint_names[robot.model().right_arm_idx[2]], 0)
+        )
+        rc_builder = rby.RobotCommandBuilder().set_command(
+            rby.ComponentBasedCommandBuilder()
+            .set_body_command(
+                rby.BodyComponentBasedCommandBuilder()
+                .set_right_arm_command(ee_builder)
+            )
+        )
+    elif (direction_ee == LEFT_END):
+        ee_builder = (
+            rby.CartesianCommandBuilder()
+            .set_command_header(
+                rby.CommandHeaderBuilder().set_control_hold_time(3)
+            )
+            .set_minimum_time(3.0)
+            .add_target("link_torso_5", "ee_left", T_target, 1.0, 1.0, 1.0)
+            # .add_joint_position_target(robot.model().robot_joint_names[robot.model().left_arm_idx[2]], 0)
+        )
+        rc_builder = rby.RobotCommandBuilder().set_command(
+            rby.ComponentBasedCommandBuilder()
+            .set_body_command(
+                rby.BodyComponentBasedCommandBuilder()
+                .set_left_arm_command(ee_builder)
+            )
+        )
+
+    rc = robot.send_command(rc_builder).get()
+    return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
+
+
+
+
+# rel_pos: end-effector frame based delta position, rel_rpy: end-effector frame based delta position, 
+def move_arm_6D_relpos_relori(robot, direction_ee, rel_pos, rel_rpy):
+    dyn_model = robot.get_dynamics()
+    model = robot.model()
+
+    dyn_state = dyn_model.make_state(
+        ["link_torso_5", "ee_right", "ee_left"],
+        model.robot_joint_names
+    )
+
+    LINK_TORSO_5_INDEX, EE_RIGHT_INDEX, EE_LEFT_INDEX = 0, 1, 2
+
+    dyn_state.set_q(robot.get_state().position)
+    dyn_model.compute_forward_kinematics(dyn_state)
+
+    # left arm 기준
+    if (direction_ee == RIGHT_END):
+        T_torso2ee = dyn_model.compute_transformation(
+            dyn_state,
+            LINK_TORSO_5_INDEX,
+            EE_RIGHT_INDEX
+        )
+    elif (direction_ee == LEFT_END):
+        T_torso2ee = dyn_model.compute_transformation(
+            dyn_state,
+            LINK_TORSO_5_INDEX,
+            EE_LEFT_INDEX
+        )
+
+    rotmat_torso2ee = T_torso2ee[0:3, 0:3]
+    pos_torso2ee = T_torso2ee[0:3, 3]
+
+    # ee기준 delta position을 torso5 기준으로 변환
+    pos_delta_ee = np.asarray(rel_pos, dtype=float)
+    pos_delta_torso = rotmat_torso2ee @ pos_delta_ee
+    pos_target = pos_torso2ee + pos_delta_torso
+    
+    # ee기준 delta orientation을 torso5 기준으로 변환
+    rotmat_delta_ee = rpy_to_rotmat(rel_rpy[0], rel_rpy[1], rel_rpy[2])
+    rotmat_delta_torso = rotmat_torso2ee @ rotmat_delta_ee
+    rotmat_target = rotmat_delta_torso
+    
+    T_target = np.eye(4)
+    T_target[0:3, 3] = pos_target
+    T_target[0:3, 0:3] = rotmat_target
+
+    if (direction_ee == RIGHT_END):
+        ee_builder = (
+            rby.CartesianCommandBuilder()
+            .set_command_header(
+                rby.CommandHeaderBuilder().set_control_hold_time(0.1)
+            )
+            .set_minimum_time(3.0)
+            .add_target("link_torso_5", "ee_right", T_target, 1.0, 1.0, 1.0)
+            # .add_joint_position_target(robot.model().robot_joint_names[robot.model().right_arm_idx[2]], 0)
+        )
+        rc_builder = rby.RobotCommandBuilder().set_command(
+            rby.ComponentBasedCommandBuilder()
+            .set_body_command(
+                rby.BodyComponentBasedCommandBuilder()
+                .set_right_arm_command(ee_builder)
+            )
+        )
+    elif (direction_ee == LEFT_END):
+        ee_builder = (
+            rby.CartesianCommandBuilder()
+            .set_command_header(
+                rby.CommandHeaderBuilder().set_control_hold_time(0.1)
+            )
+            .set_minimum_time(3.0)
+            .add_target("link_torso_5", "ee_left", T_target, 1.0, 1.0, 1.0)
+            # .add_joint_position_target(robot.model().robot_joint_names[robot.model().left_arm_idx[2]], 0)
+        )
+        rc_builder = rby.RobotCommandBuilder().set_command(
+            rby.ComponentBasedCommandBuilder()
+            .set_body_command(
+                rby.BodyComponentBasedCommandBuilder()
+                .set_left_arm_command(ee_builder)
+            )
+        )
+
+    rc = robot.send_command(rc_builder).get()
+    return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
+
+
+
+
+# rel_pos: end-effector frame based delta position, rpy_global: torso5 based orientation, 
+def move_arm_6D_relpos_globalori(robot, direction_ee, rel_pos, global_rpy):
+    dyn_model = robot.get_dynamics()
+    model = robot.model()
+
+    dyn_state = dyn_model.make_state(
+        ["link_torso_5", "ee_right", "ee_left"],
+        model.robot_joint_names
+    )
+
+    LINK_TORSO_5_INDEX, EE_RIGHT_INDEX, EE_LEFT_INDEX = 0, 1, 2
+
+    dyn_state.set_q(robot.get_state().position)
+    dyn_model.compute_forward_kinematics(dyn_state)
+
+    # left arm 기준
+    if (direction_ee == RIGHT_END):
+        T_torso2ee = dyn_model.compute_transformation(
+            dyn_state,
+            LINK_TORSO_5_INDEX,
+            EE_RIGHT_INDEX
+        )
+    elif (direction_ee == LEFT_END):
+        T_torso2ee = dyn_model.compute_transformation(
+            dyn_state,
+            LINK_TORSO_5_INDEX,
+            EE_LEFT_INDEX
+        )
+
+    rotmat_torso2ee = T_torso2ee[0:3, 0:3]
+    pos_torso2ee = T_torso2ee[0:3, 3]
+
+    # ee기준 delta position을 torso5 기준으로 변환
+    pos_delta_ee = np.asarray(rel_pos, dtype=float)
+    pos_delta_torso = rotmat_torso2ee @ pos_delta_ee
+    pos_target = pos_torso2ee + pos_delta_torso
+    
+    # torso5 기준 desired orientation
+    rotmat_target = rpy_to_rotmat(global_rpy[0], global_rpy[1], global_rpy[2])
+    rotmat_target = rotmat_torso2ee
+    
+    T_target = np.eye(4)
+    T_target[0:3, 3] = pos_target
+    T_target[0:3, 0:3] = rotmat_target
+    print(f"T_target\n: {T_target}")
+
+    if (direction_ee == RIGHT_END):
+        ee_builder = (
+            rby.CartesianCommandBuilder()
+            .set_command_header(
+                rby.CommandHeaderBuilder().set_control_hold_time(0.1)
+            )
+            .set_minimum_time(3.0)
+            .add_target("link_torso_5", "ee_right", T_target, 1.0, 1.0, 1.0)
+            # .add_joint_position_target(robot.model().robot_joint_names[robot.model().right_arm_idx[2]], 0)
+        )
+        rc_builder = rby.RobotCommandBuilder().set_command(
+            rby.ComponentBasedCommandBuilder()
+            .set_body_command(
+                rby.BodyComponentBasedCommandBuilder()
+                .set_right_arm_command(ee_builder)
+            )
+        )
+    elif (direction_ee == LEFT_END):
+        ee_builder = (
+            rby.CartesianCommandBuilder()
+            .set_command_header(
+                rby.CommandHeaderBuilder().set_control_hold_time(0.1)
+            )
+            .set_minimum_time(3.0)
+            .add_target("link_torso_5", "ee_left", T_target, 1.0, 1.0, 1.0)
+            # .add_joint_position_target(robot.model().robot_joint_names[robot.model().left_arm_idx[2]], 0)
+        )
+        rc_builder = rby.RobotCommandBuilder().set_command(
+            rby.ComponentBasedCommandBuilder()
+            .set_body_command(
+                rby.BodyComponentBasedCommandBuilder()
+                .set_left_arm_command(ee_builder)
+            )
+        )
+
+    rc = robot.send_command(rc_builder).get()
+    return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
+
+
+
+
+# rel_pos: end-effector frame based delta position
+def move_arm_relpos(robot, direction_ee, rel_pos):
+    dyn_model = robot.get_dynamics()
+    model = robot.model()
+
+    dyn_state = dyn_model.make_state(
+        ["link_torso_5", "ee_right", "ee_left"],
+        model.robot_joint_names
+    )
+
+    LINK_TORSO_5_INDEX, EE_RIGHT_INDEX, EE_LEFT_INDEX = 0, 1, 2
+
+    dyn_state.set_q(robot.get_state().position)
+    dyn_model.compute_forward_kinematics(dyn_state)
+
+    # left arm 기준
+    if (direction_ee == RIGHT_END):
+        T_torso2ee = dyn_model.compute_transformation(
+            dyn_state,
+            LINK_TORSO_5_INDEX,
+            EE_RIGHT_INDEX
+        )
+    elif (direction_ee == LEFT_END):
+        T_torso2ee = dyn_model.compute_transformation(
+            dyn_state,
+            LINK_TORSO_5_INDEX,
+            EE_LEFT_INDEX
+        )
+
+    pos_torso2ee = T_torso2ee[0:3, 3]
+    rotmat_torso2ee = T_torso2ee[0:3, 0:3]
+
+    # ee기준 delta position을 torso5 기준으로 변환
+    pos_delta_ee = np.asarray(rel_pos, dtype=float)
+    pos_delta_torso = rotmat_torso2ee @ pos_delta_ee
+    pos_target = pos_torso2ee + pos_delta_torso
+    
+    T_target = np.eye(4)
+    T_target[0:3, 3] = pos_target
+    T_target[0:3, 0:3] = rotmat_torso2ee
+    print(f"T_target\n: {T_target}")
+
+    if (direction_ee == RIGHT_END):
+        ee_builder = (
+            rby.CartesianCommandBuilder()
+            .set_command_header(
+                rby.CommandHeaderBuilder().set_control_hold_time(0.1)
+            )
+            .set_minimum_time(3.0)
+            .add_target("link_torso_5", "ee_right", T_target, 1.0, 1.0, 1.0)
+            # .add_joint_position_target(robot.model().robot_joint_names[robot.model().right_arm_idx[2]], 0)
+        )
+        rc_builder = rby.RobotCommandBuilder().set_command(
+            rby.ComponentBasedCommandBuilder()
+            .set_body_command(
+                rby.BodyComponentBasedCommandBuilder()
+                .set_right_arm_command(ee_builder)
+            )
+        )
+    elif (direction_ee == LEFT_END):
+        ee_builder = (
+            rby.CartesianCommandBuilder()
+            .set_command_header(
+                rby.CommandHeaderBuilder().set_control_hold_time(0.1)
+            )
+            .set_minimum_time(3.0)
+            .add_target("link_torso_5", "ee_left", T_target, 1.0, 1.0, 1.0)
+            # .add_joint_position_target(robot.model().robot_joint_names[robot.model().left_arm_idx[2]], 0)
+        )
+        rc_builder = rby.RobotCommandBuilder().set_command(
+            rby.ComponentBasedCommandBuilder()
+            .set_body_command(
+                rby.BodyComponentBasedCommandBuilder()
+                .set_left_arm_command(ee_builder)
+            )
+        )
+
+    rc = robot.send_command(rc_builder).get()
+    return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
+
+
+# global_pos: torso5 frame based delta position
+def move_arm_globalpos(robot, direction_ee, global_pos):
+    dyn_model = robot.get_dynamics()
+    model = robot.model()
+
+    dyn_state = dyn_model.make_state(
+        ["link_torso_5", "ee_right", "ee_left"],
+        model.robot_joint_names
+    )
+
+    LINK_TORSO_5_INDEX, EE_RIGHT_INDEX, EE_LEFT_INDEX = 0, 1, 2
+
+    dyn_state.set_q(robot.get_state().position)
+    dyn_model.compute_forward_kinematics(dyn_state)
+
+    # left arm 기준
+    if (direction_ee == RIGHT_END):
+        T_torso2ee = dyn_model.compute_transformation(
+            dyn_state,
+            LINK_TORSO_5_INDEX,
+            EE_RIGHT_INDEX
+        )
+    elif (direction_ee == LEFT_END):
+        T_torso2ee = dyn_model.compute_transformation(
+            dyn_state,
+            LINK_TORSO_5_INDEX,
+            EE_LEFT_INDEX
+        )
+
+    pos_torso2ee = T_torso2ee[0:3, 3]
+    rotmat_torso2ee = T_torso2ee[0:3, 0:3]
+
+    # torso5기준 delta position을 Add
+    pos_delta_torso = np.asarray(global_pos, dtype=float)
+    pos_target = pos_torso2ee + pos_delta_torso
+    
+    T_target = np.eye(4)
+    T_target[0:3, 3] = pos_target
+    T_target[0:3, 0:3] = rotmat_torso2ee
+    print(f"T_target\n: {T_target}")
+
+    if (direction_ee == RIGHT_END):
+        ee_builder = (
+            rby.CartesianCommandBuilder()
+            .set_command_header(
+                rby.CommandHeaderBuilder().set_control_hold_time(0.1)
+            )
+            .set_minimum_time(3.0)
+            .add_target("link_torso_5", "ee_right", T_target, 1.0, 1.0, 1.0)
+            # .add_joint_position_target(robot.model().robot_joint_names[robot.model().right_arm_idx[2]], 0)
+        )
+        rc_builder = rby.RobotCommandBuilder().set_command(
+            rby.ComponentBasedCommandBuilder()
+            .set_body_command(
+                rby.BodyComponentBasedCommandBuilder()
+                .set_right_arm_command(ee_builder)
+            )
+        )
+    elif (direction_ee == LEFT_END):
+        ee_builder = (
+            rby.CartesianCommandBuilder()
+            .set_command_header(
+                rby.CommandHeaderBuilder().set_control_hold_time(0.1)
+            )
+            .set_minimum_time(3.0)
+            .add_target("link_torso_5", "ee_left", T_target, 1.0, 1.0, 1.0)
+            # .add_joint_position_target(robot.model().robot_joint_names[robot.model().left_arm_idx[2]], 0)
+        )
+        rc_builder = rby.RobotCommandBuilder().set_command(
+            rby.ComponentBasedCommandBuilder()
+            .set_body_command(
+                rby.BodyComponentBasedCommandBuilder()
+                .set_left_arm_command(ee_builder)
+            )
+        )
+
+    rc = robot.send_command(rc_builder).get()
+    return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
+
+
+# ori: torso5 frame based orientation
+def move_arm_globalori(robot, direction_ee, global_ori):
+    dyn_model = robot.get_dynamics()
+    model = robot.model()
+
+    dyn_state = dyn_model.make_state(
+        ["link_torso_5", "ee_right", "ee_left"],
+        model.robot_joint_names
+    )
+
+    LINK_TORSO_5_INDEX, EE_RIGHT_INDEX, EE_LEFT_INDEX = 0, 1, 2
+
+    dyn_state.set_q(robot.get_state().position)
+    dyn_model.compute_forward_kinematics(dyn_state)
+
+    # left arm 기준
+    if (direction_ee == RIGHT_END):
+        T_torso2ee = dyn_model.compute_transformation(
+            dyn_state,
+            LINK_TORSO_5_INDEX,
+            EE_RIGHT_INDEX
+        )
+    elif (direction_ee == LEFT_END):
+        T_torso2ee = dyn_model.compute_transformation(
+            dyn_state,
+            LINK_TORSO_5_INDEX,
+            EE_LEFT_INDEX
+        )
+
+    pos_torso2ee = T_torso2ee[0:3, 3]
+    rotmat_torso2ee = T_torso2ee[0:3, 0:3]
+
+    # ee기준 delta position을 torso5 기준으로 변환
+    pos_target = pos_torso2ee
+    
+    rotmat_target = rpy_to_rotmat(global_ori[0], global_ori[1], global_ori[2])
+    
+    T_target = np.eye(4)
+    T_target[0:3, 3] = pos_target
+    T_target[0:3, 0:3] = rotmat_target
+    print(f"T_target\n: {T_target}")
+
+    if (direction_ee == RIGHT_END):
+        ee_builder = (
+            rby.CartesianCommandBuilder()
+            .set_command_header(
+                rby.CommandHeaderBuilder().set_control_hold_time(0.1)
+            )
+            .set_minimum_time(3.0)
+            .add_target("link_torso_5", "ee_right", T_target, 1.0, 1.0, 1.0)
+            # .add_joint_position_target(robot.model().robot_joint_names[robot.model().right_arm_idx[2]], 0)
+        )
+        rc_builder = rby.RobotCommandBuilder().set_command(
+            rby.ComponentBasedCommandBuilder()
+            .set_body_command(
+                rby.BodyComponentBasedCommandBuilder()
+                .set_right_arm_command(ee_builder)
+            )
+        )
+    elif (direction_ee == LEFT_END):
+        ee_builder = (
+            rby.CartesianCommandBuilder()
+            .set_command_header(
+                rby.CommandHeaderBuilder().set_control_hold_time(0.1)
+            )
+            .set_minimum_time(3.0)
+            .add_target("link_torso_5", "ee_left", T_target, 1.0, 1.0, 1.0)
+            # .add_joint_position_target(robot.model().robot_joint_names[robot.model().left_arm_idx[2]], 0)
+        )
+        rc_builder = rby.RobotCommandBuilder().set_command(
+            rby.ComponentBasedCommandBuilder()
+            .set_body_command(
+                rby.BodyComponentBasedCommandBuilder()
+                .set_left_arm_command(ee_builder)
+            )
+        )
+
+    rc = robot.send_command(rc_builder).get()
+    return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
+
+
+
+
+# global_pos: torso5 frame based delta position
+def move_arm_globalpos_both(robot, global_pos_R, global_pos_L):
+    dyn_model = robot.get_dynamics()
+    model = robot.model()
+
+    dyn_state = dyn_model.make_state(
+        ["link_torso_5", "ee_right", "ee_left"],
+        model.robot_joint_names
+    )
+
+    LINK_TORSO_5_INDEX, EE_RIGHT_INDEX, EE_LEFT_INDEX = 0, 1, 2
+
+    dyn_state.set_q(robot.get_state().position)
+    dyn_model.compute_forward_kinematics(dyn_state)
+
+    T_torso2ee_R = dyn_model.compute_transformation(
+        dyn_state,
+        LINK_TORSO_5_INDEX,
+        EE_RIGHT_INDEX
+    )
+    T_torso2ee_L = dyn_model.compute_transformation(
+        dyn_state,
+        LINK_TORSO_5_INDEX,
+        EE_LEFT_INDEX
+    )
+
+    pos_torso2ee_R = T_torso2ee_R[0:3, 3]
+    rotmat_torso2ee_R = T_torso2ee_R[0:3, 0:3]
+    
+    pos_torso2ee_L = T_torso2ee_L[0:3, 3]
+    rotmat_torso2ee_L = T_torso2ee_L[0:3, 0:3]
+    
+    # torso5기준 delta position을 Add
+    pos_delta_torso_R = np.asarray(global_pos_R, dtype=float)
+    pos_target_R = pos_torso2ee_R + pos_delta_torso_R
+    pos_delta_torso_L= np.asarray(global_pos_L, dtype=float)
+    pos_target_L = pos_torso2ee_L + pos_delta_torso_L
+    
+    T_target_R = np.eye(4)
+    T_target_R[0:3, 3] = pos_target_R
+    T_target_R[0:3, 0:3] = rotmat_torso2ee_R
+    T_target_L = np.eye(4)
+    T_target_L[0:3, 3] = pos_target_L
+    T_target_L[0:3, 0:3] = rotmat_torso2ee_L
+    
+    print(f"T_target_R\n: {T_target_R}")
+    print(f"T_target_L\n: {T_target_L}")
+
+    ee_builder_R = (
+        rby.CartesianCommandBuilder()
+        .set_command_header(
+            rby.CommandHeaderBuilder().set_control_hold_time(1)
+        )
+        .set_minimum_time(3.0)
+        .add_target("link_torso_5", "ee_right", T_target_R, 1.0, 1.0, 1.0)
+        # .add_joint_position_target(robot.model().robot_joint_names[robot.model().right_arm_idx[2]], 0)
+    )
+    ee_builder_L = (
+        rby.CartesianCommandBuilder()
+        .set_command_header(
+            rby.CommandHeaderBuilder().set_control_hold_time(1)
+        )
+        .set_minimum_time(3.0)
+        .add_target("link_torso_5", "ee_left", T_target_L, 1.0, 1.0, 1.0)
+        # .add_joint_position_target(robot.model().robot_joint_names[robot.model().left_arm_idx[2]], 0)
+    )
+    
+    rc_builder = rby.RobotCommandBuilder().set_command(
+        rby.ComponentBasedCommandBuilder()
+        .set_body_command(
+            rby.BodyComponentBasedCommandBuilder()
+            .set_right_arm_command(ee_builder_R)
+            .set_left_arm_command(ee_builder_L)
+        )
+    )
+
+    rc = robot.send_command(rc_builder).get()
+    return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
+
+
+
+
+
+### -------------------------- Gripper --------------------------- ###
+def DXL_write_torque_mode(dxl_id: int, torque_mode: int, port_handler, packet_handler) -> None:
+    dxl_comm_res, dxl_err = packet_handler.write1ByteTxRx(
+        port_handler,
+        dxl_id,
+        ADDR_TORQUE_ENABLE,
+        int(torque_mode)
+    )
+    if dxl_comm_res != COMM_SUCCESS:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getTxRxResult(dxl_comm_res)))
+    elif dxl_err != 0:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getRxPacketError(dxl_err)))
+    else:
+        if (torque_mode == TORQUE_DISABLE):      print("SUCCESS: Torque is disabled")
+        elif (torque_mode == TORQUE_ENABLE):     print("SUCCESS: Torque is enabled")
+        
+        
+def DXL_read_torque_mode(dxl_id: int, port_handler, packet_handler) -> Optional[int]:
+    val, dxl_comm_res, dxl_err = packet_handler.read1ByteTxRx(
+        port_handler,
+        dxl_id,
+        ADDR_TORQUE_ENABLE,
+    )
+    if dxl_comm_res != COMM_SUCCESS:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getTxRxResult(dxl_comm_res)))
+        return None
+    elif dxl_err != 0:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getRxPacketError(dxl_err)))
+        return None
+    else:
+        torque_mode = val
+        print(f"[DXL ID:{dxl_id}] SUCCESS: torque mode = {torque_mode}")
+        return torque_mode    # 0: Disabled, 1: Enabled  
+
+
+def DXL_write_operation_mode(dxl_id: int, operation_mode: int, port_handler, packet_handler) -> None:
+    dxl_comm_res, dxl_err = packet_handler.write1ByteTxRx(
+        port_handler,
+        dxl_id,
+        ADDR_OPERATING_MODE,
+        int(operation_mode),
+    )
+    if dxl_comm_res != COMM_SUCCESS:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getTxRxResult(dxl_comm_res)))
+    elif dxl_err != 0:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getRxPacketError(dxl_err)))
+    else:
+        if (operation_mode == CURRENT_CONTROL_MODE):      print("SUCCESS: Set Current Control Mode")
+        elif (operation_mode == POSITION_CONTROL_MODE):   print("SUCCESS: Set Postion Control Mode")
+    
+    
+def DXL_read_operation_mode(dxl_id: int, port_handler, packet_handler) -> Optional[int]:
+    val, dxl_comm_res, dxl_err = packet_handler.read1ByteTxRx(
+        port_handler,
+        dxl_id,
+        ADDR_OPERATING_MODE,
+    )
+    if dxl_comm_res != COMM_SUCCESS:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getTxRxResult(dxl_comm_res)))
+        return None
+    elif dxl_err != 0:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getRxPacketError(dxl_err)))
+        return None
+    else:
+        operation_mode = val
+        print(f"[DXL ID:{dxl_id}] SUCCESS: operation mode = {operation_mode}")
+        return operation_mode    # 0: Current Control, 3: Position Control    
+
+    
+
+def DXL_read_position_rad(dxl_id: int, port_handler, packet_handler) -> Optional[float]:
+    val, dxl_comm_res, dxl_err = packet_handler.read4ByteTxRx(
+        port_handler,
+        dxl_id,
+        ADDR_PRESENT_POSITION,
+    )
+    if dxl_comm_res != COMM_SUCCESS:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getTxRxResult(dxl_comm_res)))
+        return None
+    elif dxl_err != 0:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getRxPacketError(dxl_err)))
+        return None
+    else:
+        position_rad = float(val) / RESOLUTION_TICKS_PER_REV * TWO_PI 
+        print(f"[DXL ID:{dxl_id}] SUCCESS: position = {position_rad}rad")
+        return position_rad    # [rad]
+
+
+# 1-unit = 2.69mA
+def DXL_write_current_ampere(dxl_id: int, current_ampere: float, port_handler, packet_handler) -> None:        
+    current_value = int(current_ampere / 2.69 * 1000.0)
+    dxl_comm_res, dxl_err = packet_handler.write2ByteTxRx(
+        port_handler,
+        dxl_id,
+        ADDR_GOAL_CURRENT,
+        current_value,
+    )
+    if dxl_comm_res != COMM_SUCCESS:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getTxRxResult(dxl_comm_res)))
+    elif dxl_err != 0:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getRxPacketError(dxl_err)))
+    else:
+        print(f"[DXL ID:{dxl_id}] SUCCESS: Set Current [{current_ampere} A]")
+        
+
+# 1-unit = 2.69mA
+def DXL_read_current_ampere(dxl_id: int, port_handler, packet_handler) -> None:        
+    val, dxl_comm_res, dxl_err = packet_handler.read2ByteTxRx(
+        port_handler,
+        dxl_id,
+        ADDR_PRESENT_CURRENT
+    )
+    if dxl_comm_res != COMM_SUCCESS:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getTxRxResult(dxl_comm_res)))
+        return None
+    elif dxl_err != 0:
+        print("[DXL ID:%d] Fail %s" % (dxl_id, packet_handler.getRxPacketError(dxl_err)))
+        return None
+    else:
+        current_A = float(val) * 2.69 / 1000.0 
+        print(f"[DXL ID:{dxl_id}] SUCCESS: current = {current_A}A")
+        return current_A     # [A]
