@@ -3,6 +3,8 @@ import time
 import numpy as np
 from typing import Optional, List
 from dynamixel_sdk import COMM_SUCCESS
+import cv2
+import pyrealsense2 as rs
 
 
 ROBOT_ADDRESS = "192.168.30.1:50051"        # For Real Robot
@@ -20,6 +22,9 @@ READY_POS = {"torso":      np.deg2rad([0.0, 45.0, -90.0,   45.0, 0.0,  0.0]),
 READY_DEMO_POS = {"torso":      np.deg2rad([0.0, 45.0, -90.0,   45.0, 0.0,  0.0]),
                   "right_arm":  np.deg2rad([0.0, -5.0,   0.0, -130.0, 0.0, 60.0, 90.0]),
                   "left_arm":   np.deg2rad([0.0,  5.0,   0.0, -130.0, 0.0, 60.0, -90.0])}
+HEAD_POS_DEMO = [0.0, np.deg2rad(30.0)]
+EE_OFFSET_X_DEMO = 0.105
+
 
 PACK_POS = {"torso":      np.deg2rad([0.0, 80.0, -140.0,   60.0, 0.0,   0.0]),
             "right_arm":  np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0, 105.0, 0.0]),
@@ -27,6 +32,7 @@ PACK_POS = {"torso":      np.deg2rad([0.0, 80.0, -140.0,   60.0, 0.0,   0.0]),
 
 TURN_RIGHT_90   = -83.5
 TURN_LEFT_90    = 83.5
+
 
 # --- Gripper ------------------------------------ # 
 PROTOCOL_VERSION = 2.0
@@ -64,11 +70,43 @@ is_init_finish              = False
 DEMO_GRIP_CURRENT_R         = 0.8
 DEMO_GRIP_CURRENT_L         = 0.6
 DEMO_LAY_CURRENT_R          = -0.04
-DEMO_LAY_CURRENT_L          = -0.008
-DEMO_ZEROING_CURRENT_L      = 0.008
+DEMO_LAY_CURRENT_L          = -0.03
+DEMO_ZEROING_CURRENT_L      = 0.03
 DEMO_LAY_CURRENT_END        = 0.0
 
 
+
+def move_head(robot, q_head, minimum_time=2.0):
+    rc_builder = rby.RobotCommandBuilder().set_command(
+        rby.ComponentBasedCommandBuilder().set_head_command(
+            rby.JointPositionCommandBuilder()
+            .set_command_header(rby.CommandHeaderBuilder().set_control_hold_time(2.0))
+            .set_minimum_time(minimum_time)
+            .set_position(q_head)
+        )
+    )    
+    rc = robot.send_command(rc_builder).get()
+    return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
+    
+def move_neck_example(robot):
+    # [head_0, head_1]
+    q_head_center = [0.0, 0.0]
+    q_head_left = [np.deg2rad(20.0), 0.0]
+    q_head_right = [np.deg2rad(-20.0), 0.0]
+    q_head_up = [0.0, np.deg2rad(10.0)]
+    q_head_down = [0.0, np.deg2rad(-10.0)]
+    
+
+    move_head(robot, q_head_center)
+    time.sleep(1)
+    move_head(robot, q_head_left)
+    time.sleep(1)
+    move_head(robot, q_head_right)
+    time.sleep(1)
+    move_head(robot, q_head_up)
+    time.sleep(1)
+    move_head(robot, q_head_down)
+    time.sleep(1)    
 
 
 def move_position(robot, posture, minimum_time=10.0):
@@ -1039,6 +1077,30 @@ def move_arm_globalpos_both(robot, global_pos_R, global_pos_L):
     return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
 
 
+def Get_T_left_ee_from_torso5(robot):
+    dyn_model = robot.get_dynamics()
+    model = robot.model()
+
+    dyn_state = dyn_model.make_state(
+        ["link_torso_5", "ee_left"],
+        model.robot_joint_names
+    )
+
+    LINK_TORSO_5_INDEX, EE_LEFT_INDEX = 0, 1
+
+    dyn_state.set_q(robot.get_state().position)
+    dyn_model.compute_forward_kinematics(dyn_state)
+
+    T_torso2ee_L = dyn_model.compute_transformation(
+        dyn_state,
+        LINK_TORSO_5_INDEX,
+        EE_LEFT_INDEX
+    )
+    
+    return T_torso2ee_L
+
+
+
 
 
 
@@ -1275,3 +1337,133 @@ def DXL_write_current_limit(dxl_id: int, current_limit_A: float, port_handler, p
     else:
         print(f"SUCCESS: Set Current Limit: {current_limit_A}A")
     
+
+
+
+# ------- Vision -----------------------------------------------------------
+def find_block_center(frame):
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    lower_white = np.array([0, 0, 180])
+    upper_white = np.array([180, 60, 255])
+    white_mask = cv2.inRange(hsv, lower_white, upper_white)
+
+    kernel = np.ones((7, 7), np.uint8)
+    white_mask = cv2.morphologyEx(white_mask, cv2.MORPH_CLOSE, kernel)
+
+    contours, _ = cv2.findContours(
+        white_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    if not contours:
+        return None, None
+
+    table = max(contours, key=cv2.contourArea)
+
+    table_mask = np.zeros_like(white_mask)
+    cv2.drawContours(table_mask, [table], -1, 255, -1)
+
+    lower_black = np.array([0, 0, 0])
+    upper_black = np.array([180, 255, 70])
+    black_mask = cv2.inRange(hsv, lower_black, upper_black)
+
+    block_mask = cv2.bitwise_and(black_mask, table_mask)
+    block_mask = cv2.morphologyEx(block_mask, cv2.MORPH_OPEN, kernel)
+
+    contours, _ = cv2.findContours(
+        block_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    candidates = []
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        if 300 < area < 20000:
+            candidates.append(cnt)
+
+    if not candidates:
+        return None, block_mask
+
+    block = max(candidates, key=cv2.contourArea)
+
+    M = cv2.moments(block)
+    if M["m00"] == 0:
+        return None, block_mask
+
+    cx = int(M["m10"] / M["m00"])
+    cy = int(M["m01"] / M["m00"])
+
+    return (cx, cy, block), block_mask
+
+
+def get_block_position_5sec():
+    pipeline = rs.pipeline()
+    config = rs.config()
+
+    config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+    config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+
+    pipeline.start(config)
+    align = rs.align(rs.stream.color)
+
+    X_list, Y_list, Z_list = [], [], []
+
+    start_time = time.time()
+    
+    cnt = 0
+
+    try:
+        while time.time() - start_time < 5:  # 5초 동안만 실행
+            frames = pipeline.wait_for_frames()
+            frames = align.process(frames)
+
+            color_frame = frames.get_color_frame()
+            depth_frame = frames.get_depth_frame()
+
+            if not color_frame or not depth_frame:
+                continue
+
+            frame = np.asanyarray(color_frame.get_data())
+
+            result, _ = find_block_center(frame)
+
+            if result is None:
+                continue
+
+            cx, cy, _ = result
+            z = depth_frame.get_distance(cx, cy)
+
+            if z <= 0:
+                continue
+
+            depth_intrin = depth_frame.profile.as_video_stream_profile().intrinsics
+
+            X, Y, Z = rs.rs2_deproject_pixel_to_point(
+                depth_intrin,
+                [cx, cy],
+                z
+            )
+
+            if (cnt % 20 == 0):
+                print(f"X={X:.3f}, Y={Y:.3f}, Z={Z:.3f}")
+            cnt = cnt + 1
+
+            X_list.append(X)
+            Y_list.append(Y)
+            Z_list.append(Z)
+
+    finally:
+        pipeline.stop()
+
+    # 평균 계산
+    if len(X_list) == 0:
+        print("Error! No value is acquired")
+        return None
+
+    X_avg = np.mean(X_list)
+    Y_avg = np.mean(Y_list)
+    Z_avg = np.mean(Z_list)
+
+    print("\n===== Average =====")
+    print(f"X={X_avg:.3f}, Y={Y_avg:.3f}, Z={Z_avg:.3f}")
+
+    return X_avg, Y_avg, Z_avg

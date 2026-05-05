@@ -4,6 +4,15 @@ import time
 import numpy as np
 import functions as fn
 
+distance_1st_table = 0.45
+distance_2nd_table = 0.3
+distance_btw_1st_2nd_table = 2.5
+z_1st_table_down  = -0.1
+z_1st_table_up    = 0.22
+z_2nd_table_down  = -0.06
+z_2nd_table_up    = 0.06
+collect_box_Y     = 0.13
+
 # Before run this file, run the "initialize.py" file
 # ----- Connect -------------------------------------------------------------------#
 ROBOT_ADDRESS = "192.168.30.1:50051"        # For Real Robot
@@ -35,7 +44,8 @@ else:
 # --- Ping Test ---
 dxl_activated = []
 
-for dxl_id in [fn.R_DXL_ID, fn.L_DXL_ID]:
+# for dxl_id in [fn.R_DXL_ID, fn.L_DXL_ID]:
+for dxl_id in [fn.L_DXL_ID]:
     dxl_model_num, dxl_comm_res, dxl_err = packet_hdlr.ping(port_hdlr, dxl_id)
     
     if dxl_comm_res != fn.COMM_SUCCESS:
@@ -56,30 +66,52 @@ for dxl_id in dxl_activated:
 
 # ----- Ready Initial Posture --------------------------------------------------- #
 Desired_Pos = fn.READY_DEMO_POS      # ZERO_POS, READY_POS, PACK_POS, READY_DEMO_POS
+
 fn.move_position(robot, Desired_Pos, minimum_time=3)
+time.sleep(1)
+fn.move_head(robot, fn.HEAD_POS_DEMO, minimum_time=1.0)
 time.sleep(1)
 fn.DXL_write_current_ampere_safety(fn.L_DXL_ID, fn.DEMO_ZEROING_CURRENT_L, port_hdlr, packet_hdlr)
 
 
 # ----- Go Forward to 1st Table --------------------------------------------------- #
-fn.move_forward_distance_smooth(robot, 0.31)         # Forward 30cm
+fn.move_forward_distance_smooth(robot, distance_1st_table)         # Forward
 time.sleep(2)
 
 
 # ----- Move Left arm to Left Block --------------------------------------------------- #
-# pos_delta_from_torso_R = [0.175, 0.14, 0.0]
-pos_delta_from_torso_R = [0.0, 0.0, 0.0]
-pos_delta_from_torso_L = [0.18, -0.1, 0.0]
-fn.move_arm_globalpos_both(robot, pos_delta_from_torso_R, pos_delta_from_torso_L)
+# Vision Sensing
+vision_state = 0
+while (vision_state == 0):
+    obj_pos = fn.get_block_position_5sec()
+    if (obj_pos != None):
+        vision_state = 1
+T_left_ee_from_torso5 = fn.Get_T_left_ee_from_torso5(robot)
 
+x_vision = obj_pos[0]
+y_vision = obj_pos[1]
+z_vision = obj_pos[2]
+
+x_left_ee_from_torso5_now = T_left_ee_from_torso5[0,3]
+y_left_ee_from_torso5_now = T_left_ee_from_torso5[1,3]
+
+x_delta_robot = z_vision * np.cos(fn.HEAD_POS_DEMO[1])
+x_delta_robot = x_delta_robot - x_left_ee_from_torso5_now - fn.EE_OFFSET_X_DEMO
+
+y_delta_robot = -x_vision - y_left_ee_from_torso5_now
+pos_delta_from_torso_L = [x_delta_robot, y_delta_robot, 0.0]
+print(f"pos_delta_from_torso_L: {pos_delta_from_torso_L}")
+
+pos_delta_from_torso_R = [0.0, 0.0, 0.0]
+fn.move_arm_globalpos_both(robot, pos_delta_from_torso_R, pos_delta_from_torso_L)
 time.sleep(1)
+
 # fn.DXL_current_control_smooth(fn.R_DXL_ID, port_hdlr, packet_hdlr, fn.DEMO_LAY_CURRENT_R, fn.DEMO_LAY_CURRENT_END)
 fn.DXL_current_control_smooth(fn.L_DXL_ID, port_hdlr, packet_hdlr, fn.DEMO_LAY_CURRENT_L, fn.DEMO_LAY_CURRENT_END)
 
-z = -0.16
 # pos_delta_from_torso_R = [0.0, 0.0, z]
 pos_delta_from_torso_R = [0.0, 0.0, 0.0]
-pos_delta_from_torso_L = [0.0, 0.0, z]
+pos_delta_from_torso_L = [0.0, 0.0, z_1st_table_down]
 fn.move_arm_globalpos_both(robot, pos_delta_from_torso_R, pos_delta_from_torso_L)
 time.sleep(1)
 
@@ -90,16 +122,15 @@ fn.DXL_write_current_ampere_safety(fn.L_DXL_ID, fn.DEMO_GRIP_CURRENT_L, port_hdl
 
 
 # ----- Lift UP ------------------------------------------------------------ #
-z = 0.2
 # pos_delta_from_torso_R = [0.0, 0.0, z]
 pos_delta_from_torso_R = [0.0, 0.0, 0.04]
-pos_delta_from_torso_L = [0.0, 0.0, z]
+pos_delta_from_torso_L = [0.0, 0.0, z_1st_table_up]
 fn.move_arm_globalpos_both(robot, pos_delta_from_torso_R, pos_delta_from_torso_L)
 time.sleep(1)
 
 
 # ----- Go Backward from 1st Table --------------------------------------------------- #
-fn.move_forward_distance_smooth(robot, -0.31)         # Backward 30cm
+fn.move_forward_distance_smooth(robot, -distance_1st_table)         # Backward 30cm
 time.sleep(1)
 
 
@@ -109,7 +140,7 @@ time.sleep(1)
 
 
 # ----- Go Forward to 2nd Table --------------------------------------------------- #
-fn.move_forward_distance_smooth(robot, 2.5)         # Forward 250cm
+fn.move_forward_distance_smooth(robot, distance_btw_1st_2nd_table)         # Forward 250cm
 time.sleep(1)
 
 
@@ -119,21 +150,20 @@ time.sleep(1)
 
 
 # ----- Go Forward to 2nd Table --------------------------------------------------- #
-fn.move_forward_distance_smooth(robot, 0.31)         # Forward 30cm
+fn.move_forward_distance_smooth(robot, distance_2nd_table)         # Forward 30cm
 time.sleep(1)
 
 
 # ----- Move Left arm to Left collecting box -------------------------------------------- #
 # pos_delta_from_torso_R = [0.0, -0.17, 0.0]
 pos_delta_from_torso_R = [0.0, 0.0, 0.0]
-pos_delta_from_torso_L = [0.0, 0.13, 0.0]
+pos_delta_from_torso_L = [0.0, collect_box_Y, 0.0]
 fn.move_arm_globalpos_both(robot, pos_delta_from_torso_R, pos_delta_from_torso_L)
 time.sleep(1)
 
-z = -0.08
 # pos_delta_from_torso_R = [0.0, 0.0, z]
 pos_delta_from_torso_R = [0.0, 0.0, 0.0]
-pos_delta_from_torso_L = [0.0, 0.0, z]
+pos_delta_from_torso_L = [0.0, 0.0, z_2nd_table_down]
 fn.move_arm_globalpos_both(robot, pos_delta_from_torso_R, pos_delta_from_torso_L)
 time.sleep(1)
 
@@ -144,16 +174,15 @@ fn.DXL_current_control_smooth(fn.L_DXL_ID, port_hdlr, packet_hdlr, fn.DEMO_LAY_C
 
 
 # ----- Lift up Left arm --------------------------------------------------- #
-z = 0.08
 # pos_delta_from_torso_R = [0.0, 0.0, z]
 pos_delta_from_torso_R = [0.0, 0.0, 0.0]
-pos_delta_from_torso_L = [0.0, 0.0, z]
+pos_delta_from_torso_L = [0.0, 0.0, z_2nd_table_up]
 fn.move_arm_globalpos_both(robot, pos_delta_from_torso_R, pos_delta_from_torso_L)
 time.sleep(1)
 
 
 # ----- Go Backward from 2nd Table --------------------------------------------------- #
-fn.move_forward_distance_smooth(robot, -0.31)         # Backward 30cm
+fn.move_forward_distance_smooth(robot, distance_2nd_table)         # Backward 30cm
 time.sleep(1)
 
 
@@ -163,7 +192,7 @@ time.sleep(1)
 
 
 # ----- Go Forward to 1st Table --------------------------------------------------- #
-fn.move_forward_distance_smooth(robot, 2.5)         # Forward 250cm
+fn.move_forward_distance_smooth(robot, distance_btw_1st_2nd_table)         # Forward 250cm
 time.sleep(1)
 
 
