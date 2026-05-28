@@ -5,36 +5,49 @@ from typing import Optional, List
 from dynamixel_sdk import COMM_SUCCESS
 import cv2
 import pyrealsense2 as rs
+import logging
 
 
 ROBOT_ADDRESS = "192.168.30.1:50051"        # For Real Robot
 RIGHT_END     = 0       # Right End Effector idx
 LEFT_END      = 1       # Left End Effector idx
 
-ZERO_POS = {"torso":      np.deg2rad([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
-             "right_arm": np.deg2rad([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
-             "left_arm":  np.deg2rad([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])}
 
-READY_POS = {"torso":      np.deg2rad([0.0, 45.0, -90.0,   45.0, 0.0,  0.0]),
-             "right_arm":  np.deg2rad([0.0, -5.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
-             "left_arm":   np.deg2rad([0.0,  5.0,   0.0, -120.0, 0.0, 70.0, 0.0])}
+#----- 22-DoF Posture -----#
+ZERO_POS = {"torso":     np.deg2rad([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+            "right_arm": np.deg2rad([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+            "left_arm":  np.deg2rad([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+            "head":      np.deg2rad([0.0, 0.0])}
 
-READY_DEMO_POS = {"torso":      np.deg2rad([0.0, 45.0, -90.0,   45.0, 0.0,  0.0]),
-                  "right_arm":  np.deg2rad([0.0, -5.0,   0.0, -130.0, 0.0, 60.0, 90.0]),
-                  "left_arm":   np.deg2rad([0.0,  5.0,   0.0, -130.0, 0.0, 60.0, -90.0])}
-HEAD_POS_DEMO = [0.0, np.deg2rad(30.0)]
-EE_OFFSET_X_DEMO = 0.105
+READY_POS = {"torso":     np.deg2rad([0.0, 45.0, -90.0,   45.0, 0.0,  0.0]),
+             "right_arm": np.deg2rad([0.0, -5.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
+             "left_arm":  np.deg2rad([0.0,  5.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
+             "head":      np.deg2rad([0.0, 0.0])}
+
+PACK_POS = {"torso":     np.deg2rad([0.0, 80.0, -140.0,   60.0, 0.0,   0.0]),
+            "right_arm": np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0, 105.0, 0.0]),
+            "left_arm":  np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0, 105.0, 0.0]),
+            "head":      np.deg2rad([0.0, 0.0])}
+
+READY_DEMO_POS = {"torso":     np.deg2rad([0.0, 45.0, -90.0,   45.0, 0.0,  0.0]),
+                  "right_arm": np.deg2rad([0.0, -5.0,   0.0, -130.0, 0.0, 60.0, 90.0]),
+                  "left_arm":  np.deg2rad([0.0,  5.0,   0.0, -130.0, 0.0, 60.0, -90.0]),
+                  "head":      np.deg2rad([0.0, 30.0])}
 
 
-PACK_POS = {"torso":      np.deg2rad([0.0, 80.0, -140.0,   60.0, 0.0,   0.0]),
-            "right_arm":  np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0, 105.0, 0.0]),
-            "left_arm":   np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0, 105.0, 0.0])}
+#----- 2-DoF Head Posture -----#
+HEAD_POS_DEMO = [0.0, np.deg2rad(30.0)] 
+HEAD_ZERO_POS = [0.0, 0.0]
+
+
+#----- Setting Parameters -----#
+EE_OFFSET_X_DEMO = 0.105    # End-effector offset
 
 TURN_RIGHT_90   = -83.5
 TURN_LEFT_90    = 83.5
 
 
-# --- Gripper ------------------------------------ # 
+#----- Gripper -----# 
 PROTOCOL_VERSION = 2.0
 BAUDRATE = 2000000
 DEVICE_NAME_GRIPPER = "/dev/rby1_gripper"
@@ -75,8 +88,11 @@ DEMO_ZEROING_CURRENT_L      = 0.03
 DEMO_LAY_CURRENT_END        = 0.0
 
 
-
+#----- Functions -------------------------# 
 def move_head(robot, q_head, minimum_time=2.0):
+    """
+        q_head: np.array/list  # 2 dof, e.g. [head_0: yaw, head_1: pitch]
+    """
     rc_builder = rby.RobotCommandBuilder().set_command(
         rby.ComponentBasedCommandBuilder().set_head_command(
             rby.JointPositionCommandBuilder()
@@ -86,7 +102,10 @@ def move_head(robot, q_head, minimum_time=2.0):
         )
     )    
     rc = robot.send_command(rc_builder).get()
+    
     return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
+    
+    
     
 def move_neck_example(robot):
     # [head_0, head_1]
@@ -109,35 +128,111 @@ def move_neck_example(robot):
     time.sleep(1)    
 
 
-def move_position(robot, posture, minimum_time=10.0):
-    rc_builder = rby.RobotCommandBuilder().set_command(
-        rby.ComponentBasedCommandBuilder().set_body_command(
-            rby.BodyComponentBasedCommandBuilder()
-            # Set Torso Command with Joint Position Command
-            .set_torso_command(
-                rby.JointPositionCommandBuilder()
-                .set_command_header(rby.CommandHeaderBuilder().set_control_hold_time(0.5))  # For saturation
-                .set_minimum_time(minimum_time)
-                .set_position(posture["torso"])
-            )
-            # Set Right Command with Joint Position Command
-            .set_right_arm_command(
-                rby.JointPositionCommandBuilder()
-                .set_command_header(rby.CommandHeaderBuilder().set_control_hold_time(0.5))
-                .set_minimum_time(minimum_time)
-                .set_position(posture["right_arm"])
-            )
-            # Set Left Command with Joint Position Command
-            .set_left_arm_command(
-                rby.JointPositionCommandBuilder()
-                .set_command_header(rby.CommandHeaderBuilder().set_control_hold_time(0.5))
-                .set_minimum_time(minimum_time)
-                .set_position(posture["left_arm"])
-            )
-        )
+
+def make_joint_position_command(q_list, minimum_time=5.0, control_hold_time=0.5):
+    return (rby.JointPositionCommandBuilder()
+            .set_command_header(rby.CommandHeaderBuilder().set_control_hold_time(control_hold_time))
+            .set_minimum_time(minimum_time)
+            .set_position(q_list)
     )
+
+
+def move_position_20dof(robot, posture, minimum_time=5.0, control_hold_time=0.5):
+    """
+    posture:
+        {
+            "torso": np.array/list,      # 6 dof
+            "right_arm": np.array/list,  # 7 dof
+            "left_arm": np.array/list    # 7 dof
+        }
+    """
+    component_cmd_builder = rby.ComponentBasedCommandBuilder()
+
+    body_cmd_builder = rby.BodyComponentBasedCommandBuilder()
+    has_body_command = False
+    
+    q_torso = posture.get("torso")
+    q_right_arm = posture.get("right_arm")
+    q_left_arm = posture.get("left_arm")
+    q_head = posture.get("head")
+    
+    #--- Body ---#
+    if q_torso is not None:
+        body_cmd_builder.set_torso_command(make_joint_position_command(q_torso, minimum_time, control_hold_time))
+        has_body_command = True
+
+    if q_right_arm is not None:
+        body_cmd_builder.set_right_arm_command(make_joint_position_command(q_right_arm, minimum_time, control_hold_time))
+        has_body_command = True
+
+    if q_left_arm is not None:
+        body_cmd_builder.set_left_arm_command(make_joint_position_command(q_left_arm, minimum_time, control_hold_time))
+        has_body_command = True
+
+    if has_body_command:
+        component_cmd_builder.set_body_command(body_cmd_builder)
+
+    rc_builder = rby.RobotCommandBuilder().set_command(component_cmd_builder)
     rc = robot.send_command(rc_builder).get()
-    return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
+    
+    if rc.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
+        logging.error("Failed to conduct [move_position_22dof].")
+        return False
+    return True
+
+
+
+def move_position_22dof(robot, posture, minimum_time=5.0, control_hold_time=0.5):
+    """
+    posture:
+        {
+            "torso": np.array/list,      # 6 dof
+            "right_arm": np.array/list,  # 7 dof
+            "left_arm": np.array/list    # 7 dof
+            "head": np.array/list        # 2 dof (0: yaw, 1: pitch)
+        }
+    """
+    
+    component_cmd_builder = rby.ComponentBasedCommandBuilder()
+
+    body_cmd_builder = rby.BodyComponentBasedCommandBuilder()
+    has_body_command = False
+    
+    q_torso = posture.get("torso")
+    q_right_arm = posture.get("right_arm")
+    q_left_arm = posture.get("left_arm")
+    q_head = posture.get("head")
+    
+    #--- Body ---#
+    if q_torso is not None:
+        body_cmd_builder.set_torso_command(make_joint_position_command(q_torso, minimum_time, control_hold_time))
+        has_body_command = True
+
+    if q_right_arm is not None:
+        body_cmd_builder.set_right_arm_command(make_joint_position_command(q_right_arm, minimum_time, control_hold_time))
+        has_body_command = True
+
+    if q_left_arm is not None:
+        body_cmd_builder.set_left_arm_command(make_joint_position_command(q_left_arm, minimum_time, control_hold_time))
+        has_body_command = True
+
+    if has_body_command:
+        component_cmd_builder.set_body_command(body_cmd_builder)
+
+    #--- Head ---#
+    if q_head is not None:
+        component_cmd_builder.set_head_command(make_joint_position_command(q_head, minimum_time))
+
+    # if not has_body_command and q_head is None:
+    #     raise ValueError("No command was provided. At least one posture entry must be not None.")
+
+    rc_builder = rby.RobotCommandBuilder().set_command(component_cmd_builder)
+    rc = robot.send_command(rc_builder).get()
+    
+    if rc.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
+        logging.error("Failed to conduct [move_position_22dof].")
+        return False
+    return True
 
 
 
@@ -283,8 +378,12 @@ def move_forward_distance_smooth(
 def get_yaw(odom):
     return np.arctan2(odom[1, 0], odom[0, 0])
 
+
+
 def normalize_angle(angle):
     return (angle + np.pi) % (2 * np.pi) - np.pi
+
+
 
 def rotate_inplace_smooth(
     robot,
@@ -359,7 +458,6 @@ def rotate_inplace_smooth(
             time.sleep(0.05)
 
         stream.cancel()
-        
         
         
         
@@ -473,6 +571,7 @@ def move_endeffector(robot, direction_ee, rel_delta_pos):
 #     return rc.finish_code
     
     
+    
 def rpy_to_rotmat(roll, pitch, yaw):
     Rx = np.array([
         [1,       0,            0      ],
@@ -493,6 +592,7 @@ def rpy_to_rotmat(roll, pitch, yaw):
     ])
 
     return Rz @ Ry @ Rx   # xyz convention
+
 
 
 # rel_delta_pos: end-effector 기준 position delta
@@ -575,7 +675,6 @@ def move_arm_pos(robot, direction_ee, rel_delta_pos):
 
     rc = robot.send_command(rc_builder).get()
     return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
-
 
 
 
@@ -665,7 +764,6 @@ def move_arm_6D_relpos_relori(robot, direction_ee, rel_pos, rel_rpy):
 
 
 
-
 # rel_pos: end-effector frame based delta position, rpy_global: torso5 based orientation, 
 def move_arm_6D_relpos_globalori(robot, direction_ee, rel_pos, global_rpy):
     dyn_model = robot.get_dynamics()
@@ -752,7 +850,6 @@ def move_arm_6D_relpos_globalori(robot, direction_ee, rel_pos, global_rpy):
 
 
 
-
 # rel_pos: end-effector frame based delta position
 def move_arm_relpos(robot, direction_ee, rel_pos):
     dyn_model = robot.get_dynamics()
@@ -834,6 +931,7 @@ def move_arm_relpos(robot, direction_ee, rel_pos):
     return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
 
 
+
 # global_pos: torso5 frame based delta position
 def move_arm_globalpos(robot, direction_ee, global_pos):
     dyn_model = robot.get_dynamics()
@@ -912,6 +1010,7 @@ def move_arm_globalpos(robot, direction_ee, global_pos):
 
     rc = robot.send_command(rc_builder).get()
     return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
+
 
 
 # ori: torso5 frame based orientation
@@ -996,7 +1095,6 @@ def move_arm_globalori(robot, direction_ee, global_ori):
 
 
 
-
 # global_pos: torso5 frame based delta position
 def move_arm_globalpos_both(robot, global_pos_R, global_pos_L):
     dyn_model = robot.get_dynamics()
@@ -1077,6 +1175,7 @@ def move_arm_globalpos_both(robot, global_pos_R, global_pos_L):
     return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
 
 
+
 def Get_T_left_ee_from_torso5(robot):
     dyn_model = robot.get_dynamics()
     model = robot.model()
@@ -1104,7 +1203,7 @@ def Get_T_left_ee_from_torso5(robot):
 
 
 
-### -------------------------- Gripper --------------------------- ###
+#----- Functions for Gripper ---------------------------#
 def DXL_write_torque_mode(dxl_id: int, torque_mode: int, port_handler, packet_handler) -> None:
     dxl_comm_res, dxl_err = packet_handler.write1ByteTxRx(
         port_handler,
@@ -1340,7 +1439,8 @@ def DXL_write_current_limit(dxl_id: int, current_limit_A: float, port_handler, p
 
 
 
-# ------- Vision -----------------------------------------------------------
+
+#----- Functions for IntelRealsense(D435i) --------------------#
 def find_block_center(frame):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
