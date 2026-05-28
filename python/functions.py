@@ -89,7 +89,7 @@ DEMO_LAY_CURRENT_END        = 0.0
 
 
 #----- Functions -------------------------# 
-def move_head(robot, q_head, minimum_time=2.0):
+def move_head(robot, q_head, minimum_time=2.0, get_return=True):
     """
         q_head: np.array/list  # 2 dof, e.g. [head_0: yaw, head_1: pitch]
     """
@@ -101,9 +101,11 @@ def move_head(robot, q_head, minimum_time=2.0):
             .set_position(q_head)
         )
     )    
-    rc = robot.send_command(rc_builder).get()
-    
-    return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
+    if (get_return == True):
+        rc = robot.send_command(rc_builder).get()
+        return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
+    else:
+        rc = robot.send_command(rc_builder)
     
     
     
@@ -137,7 +139,7 @@ def make_joint_position_command(q_list, minimum_time=5.0, control_hold_time=0.5)
     )
 
 
-def move_position_20dof(robot, posture, minimum_time=5.0, control_hold_time=0.5):
+def move_position_20dof(robot, posture, minimum_time=5.0, control_hold_time=0.5, get_return=True):
     """
     posture:
         {
@@ -173,16 +175,21 @@ def move_position_20dof(robot, posture, minimum_time=5.0, control_hold_time=0.5)
         component_cmd_builder.set_body_command(body_cmd_builder)
 
     rc_builder = rby.RobotCommandBuilder().set_command(component_cmd_builder)
-    rc = robot.send_command(rc_builder).get()
     
-    if rc.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
-        logging.error("Failed to conduct [move_position_22dof].")
-        return False
-    return True
+    if (get_return == True):
+        rc = robot.send_command(rc_builder).get()
+        
+        if rc.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
+            logging.error("Failed to conduct [move_position_22dof].")
+            return False
+        return True
+    else:
+        rc = robot.send_command(rc_builder)
+        return rc
 
 
 
-def move_position_22dof(robot, posture, minimum_time=5.0, control_hold_time=0.5):
+def move_position_22dof(robot, posture, minimum_time=5.0, control_hold_time=0.5, get_return=True):
     """
     posture:
         {
@@ -227,12 +234,17 @@ def move_position_22dof(robot, posture, minimum_time=5.0, control_hold_time=0.5)
     #     raise ValueError("No command was provided. At least one posture entry must be not None.")
 
     rc_builder = rby.RobotCommandBuilder().set_command(component_cmd_builder)
-    rc = robot.send_command(rc_builder).get()
     
-    if rc.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
-        logging.error("Failed to conduct [move_position_22dof].")
-        return False
-    return True
+    if (get_return == True):
+        rc = robot.send_command(rc_builder).get()
+        
+        if rc.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
+            logging.error("Failed to conduct [move_position_22dof].")
+            return False
+        return True
+    else:
+        rc = robot.send_command(rc_builder)
+        return rc
 
 
 
