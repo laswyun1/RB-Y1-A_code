@@ -12,5 +12,5 @@ if not robot.connect():
     exit(1)
 else:
     print("Start to move READY position")
-    fn.move_position(robot, fn.READY_POS)
+    fn.move_position_22dof(robot, fn.READY_POS)
     print("End to move READY position")

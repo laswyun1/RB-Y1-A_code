@@ -12,7 +12,7 @@ if not robot.connect():
     exit(1)
 else:
     print("Start to move ZERO position")
-    fn.move_position(robot, fn.ZERO_POS)
+    fn.move_position_22dof(robot, fn.ZERO_POS)
     print("End to move ZERO position")
     
     

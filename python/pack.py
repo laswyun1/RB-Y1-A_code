@@ -12,5 +12,5 @@ if not robot.connect():
     exit(1)
 else:
     print("Start to move PACK position")
-    fn.move_position(robot, fn.PACK_POS)
+    fn.move_position_22dof(robot, fn.PACK_POS)
     print("End to move PACK position")
