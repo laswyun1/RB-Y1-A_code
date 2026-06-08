@@ -7,7 +7,7 @@ import functions as fn
 init_distance_offset = 0.019
 distance_1st_table = 0.45
 distance_2nd_table = 0.32
-distance_btw_1st_2nd_table = 2.5
+distance_btw_1st_2nd_table = 2.3                #  05/06: 2.5m, 06/09: 2.3m 
 z_1st_table_down  = -0.1
 z_1st_table_up    = 0.22
 z_2nd_table_down  = -0.06
@@ -68,7 +68,7 @@ for dxl_id in dxl_activated:
 # ----- Ready Initial Posture --------------------------------------------------- #
 Desired_Pos = fn.READY_DEMO_POS      # ZERO_POS, READY_POS, PACK_POS, READY_DEMO_POS
 
-fn.move_position(robot, Desired_Pos, minimum_time=3)
+fn.move_position_22dof(robot, Desired_Pos, minimum_time=3)
 time.sleep(1)
 fn.move_head(robot, fn.HEAD_POS_DEMO, minimum_time=1.0)
 time.sleep(1)
@@ -197,7 +197,7 @@ time.sleep(1)
 
 
 # ----- Reset Posture -----------------------------------------------#
-fn.move_position(robot, Desired_Pos, minimum_time=3)
+fn.move_position_22dof(robot, Desired_Pos, minimum_time=3)
 time.sleep(1)
 
 

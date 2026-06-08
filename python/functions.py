@@ -1108,7 +1108,7 @@ def move_arm_globalori(robot, direction_ee, global_ori):
 
 
 # global_pos: torso5 frame based delta position
-def move_arm_globalpos_both(robot, global_pos_R, global_pos_L):
+def move_arm_globalpos_both(robot, global_pos_R, global_pos_L, minimum_time=3.0):
     dyn_model = robot.get_dynamics()
     model = robot.model()
 
@@ -1160,7 +1160,7 @@ def move_arm_globalpos_both(robot, global_pos_R, global_pos_L):
         .set_command_header(
             rby.CommandHeaderBuilder().set_control_hold_time(1)
         )
-        .set_minimum_time(3.0)
+        .set_minimum_time(minimum_time)
         .add_target("link_torso_5", "ee_right", T_target_R, 1.0, 1.0, 1.0)
         # .add_joint_position_target(robot.model().robot_joint_names[robot.model().right_arm_idx[2]], 0)
     )
@@ -1169,7 +1169,7 @@ def move_arm_globalpos_both(robot, global_pos_R, global_pos_L):
         .set_command_header(
             rby.CommandHeaderBuilder().set_control_hold_time(1)
         )
-        .set_minimum_time(3.0)
+        .set_minimum_time(minimum_time)
         .add_target("link_torso_5", "ee_left", T_target_L, 1.0, 1.0, 1.0)
         # .add_joint_position_target(robot.model().robot_joint_names[robot.model().left_arm_idx[2]], 0)
     )
@@ -1456,11 +1456,14 @@ def DXL_write_current_limit(dxl_id: int, current_limit_A: float, port_handler, p
 def find_block_center(frame):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-    lower_white = np.array([0, 0, 180])
-    upper_white = np.array([180, 60, 255])
+    # lower_white = np.array([0, 0, 180])
+    # upper_white = np.array([180, 60, 255])
+    lower_white = np.array([0, 0, 140])
+    upper_white = np.array([180, 90, 255])
     white_mask = cv2.inRange(hsv, lower_white, upper_white)
 
-    kernel = np.ones((7, 7), np.uint8)
+    # kernel = np.ones((7, 7), np.uint8)
+    kernel = np.ones((5, 5), np.uint8)
     white_mask = cv2.morphologyEx(white_mask, cv2.MORPH_CLOSE, kernel)
 
     contours, _ = cv2.findContours(
