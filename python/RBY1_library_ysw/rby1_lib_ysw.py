@@ -1,3 +1,6 @@
+"""Total Library"""
+"""Just type "import rby1_lib_ysw as ysw" in other code files"""
+
 from default_lib import *
 from robot_info import *
 from dynamics_lib import *

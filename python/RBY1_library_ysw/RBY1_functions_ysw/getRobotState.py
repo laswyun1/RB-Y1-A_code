@@ -1,3 +1,13 @@
+# Get Robot States once
+# 
+# Usage example:
+#       (Remotely connect to Real RBY1-A robot UPC)
+#       python3 getRobotState.py
+#
+# Copyright (c) 2026 Precision Mechatronics Laboratory, KAIST. All rights reserved.
+# Author: Seungwon Yun
+
+
 # =============================================================================
 # Import
 # =============================================================================

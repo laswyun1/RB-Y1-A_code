@@ -1,13 +1,26 @@
+# Default Library for RBY1-A
+# This Library contains robot default settings and general functions
+# This should be imported in "rby1_lib_ysw.py"
+# 
+# Usage example:
+#       from default_lib import *
+#
+# Copyright (c) 2026 Precision Mechatronics Laboratory, KAIST. All rights reserved.
+# Author: Seungwon Yun
+
+
 # =============================================================================
 # Import
 # =============================================================================
 import rby1_sdk as rby
 import robot_info as RI
-import utility_ysw as UTIL
+import utils as UTIL
 import logging
 import numpy as np
 import time
 from typing import Union
+import signal
+import sys
 
 
 
@@ -291,3 +304,81 @@ def setLED(robot, rgb, duration, transition_time, blinking, blinking_freq):
         robot.set_led_color(rby.Color(*rgb), duration, transition_time, blinking)
     else:
         robot.set_led_color(rby.Color(*rgb), duration, transition_time, blinking, blinking_freq)
+        
+        
+        
+        
+
+class Recorder:
+    """
+    Robot should be 'Initialized' before you use this Class 
+    """
+    def __init__(self, robot, filename: str="record_data.npz", rate: int=10):
+        self.robot = robot
+        self.filename = filename
+        self.rate = rate
+        self.record_list = []
+        self.record_flag = False
+        self.is_state_update_started = False
+        self.saved = False
+        
+        
+    def callback(self, state):
+        if self.record_flag:
+            print("---")
+            print(f"Target position: {state.target_position}")
+            print(f"Current position: {state.position}")
+            current_state = state.position.copy()
+            self.record_list.append(current_state)
+            
+            
+    def save(self):
+        if not self.saved:
+            np.savez_compressed(self.filename, data=np.asarray(self.record_list))
+            self.saved = True
+            print(f"Recording stopped and data saved to '{self.filename}'.")
+            print(f"Recorded samples: {len(self.record_list)}")
+    
+    
+    def start_record(self):
+        self.record_list = []
+        self.record_flag = True
+        self.saved = False
+        
+        if not self.is_state_update_started:
+            self.robot.start_state_update(self.callback, self.rate)
+            self.is_state_update_started = True
+        
+        UTIL.print_start_title("Recording Started...")
+        
+        
+    def stop_record(self):
+        self.record_flag = False
+        
+        if self.is_state_update_started:
+            self.robot.stop_state_update()
+            self.is_state_update_started = False
+        
+        UTIL.print_end_title("Recording Stopped")
+        self.save()
+        
+        
+    def handle_exit(self):
+        """ Handler called when the program exits. """
+        self.stop_record()
+        sys.exit(0)
+        
+        
+    def run_record(self):
+        signal.signal(signal.SIGINT, self.handle_exit)      # SIGINT  : Ctrl+C
+        signal.signal(signal.SIGTERM, self.handle_exit)     # SIGTERM : termination signal
+        
+        self.start_record()
+        
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            self.handle_exit()
+        
+        

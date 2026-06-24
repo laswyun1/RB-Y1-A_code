@@ -1,3 +1,13 @@
+# Get Robot States periodically (default: 100secs)
+# 
+# Usage example:
+#       (Remotely connect to Real RBY1-A robot UPC)
+#       python3 getRobotStateStream.py
+#
+# Copyright (c) 2026 Precision Mechatronics Laboratory, KAIST. All rights reserved.
+# Author: Seungwon Yun
+
+
 # =============================================================================
 # Import
 # =============================================================================
