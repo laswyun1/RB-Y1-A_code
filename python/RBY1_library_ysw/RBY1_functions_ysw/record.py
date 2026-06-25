@@ -1,4 +1,4 @@
-# Record Robot's position data until (Ctrl+C or Ctrl+Z)
+# Record Robot's position data until (Ctrl+C, not Ctrl+Z)
 # Saved file: "recorded_data.npz"
 # Load: np.load("recorded_data.npz")["data"]
 # 

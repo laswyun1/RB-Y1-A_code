@@ -72,9 +72,9 @@ def initialize(mode: str, address: str, model: str, power: str=".*", servo: str=
     if (option in (RI.CONNECT_ONLY, RI.CONNECT_AND_POWER)):
         # 2.Connect to Robot
         if not robot.connect():                                     # Connect
-            logging.error("Failed to connect to robot")
+            logging.error("Failed to connect to the Robot")
             return None
-        logging.info("SUCCESS: Connected to the robot!")
+        logging.info("SUCCESS: Connected to the Robot!")
     
     if (option == RI.CONNECT_AND_POWER):
         # 3.Power ON
@@ -82,14 +82,14 @@ def initialize(mode: str, address: str, model: str, power: str=".*", servo: str=
             if not robot.power_on(power):                           # Power ON
                 logging.error("Failed to Power ON")
                 return None
-        logging.info("SUCCESS: Power ON the robot!")
+        logging.info("SUCCESS: Power ON the Robot!")
 
         # 4.Servo ON
         if not robot.is_servo_on(servo):                            # Servo Check
             if not robot.servo_on(servo):                           # Servo ON
                 logging.error("Failed to Servo ON")
                 return None
-        logging.info("SUCCESS: Servo ON the robot!")
+        logging.info("SUCCESS: Servo ON the Robot!")
     
         # 5.Reset Control Manager
         if robot.get_control_manager_state().state in [             # CM Check
@@ -97,25 +97,25 @@ def initialize(mode: str, address: str, model: str, power: str=".*", servo: str=
             rby.ControlManagerState.State.MinorFault
         ]:
             if not robot.reset_fault_control_manager():             # CM Reset
-                logging.error("Failed to Reset control manager")
+                logging.error("Failed to Reset the Control Manager")
                 return None
-        logging.info("SUCCESS: Reset the control manager!")
+        logging.info("SUCCESS: Reset the Control Manager!")
     
         # 6.Enable Control Manager
         if not robot.enable_control_manager():                      # CM Enable
-            logging.error("Failed to Enable control manager")
+            logging.error("Failed to Enable the Control Manager")
             return None
-        logging.info("SUCCESS: Enable the control manager!")
+        logging.info("SUCCESS: Enable the Control Manager!")
         
         # 7.Enable Grippers (Only for UPC mode)
         if mode == RI.MODE_DIRECT_UPC:
             if not robot.set_tool_flange_output_voltage("right", RI.TOOL_FLANGE_VOLTAGE_ON):   # Power ON R-gripper
-                logging.error("Failed to Enable Right gripper")
+                logging.error("Failed to Enable the Right Gripper")
                 return None
             if not robot.set_tool_flange_output_voltage("left", RI.TOOL_FLANGE_VOLTAGE_ON):    # Power ON L-gripper
-                logging.error("Failed to Enable Left gripper")
+                logging.error("Failed to Enable the Left Gripper")
                 return None
-            logging.info("SUCCESS: Enable Grippers!")
+            logging.info("SUCCESS: Enable the Grippers!")
         
     UTIL.print_end_title("Intialization is Done")
     return robot
@@ -126,23 +126,29 @@ def powerOFF(robot, robotConfig: RobotConfig) -> bool:
     """
     [Ex] ysw.powerOFF(robot, robotConfig)
     """ 
+    
+    # 0.Check Power State
+    if not robot.is_power_on(".*"): 
+        logging.info("Already Power OFF")
+        return True
+    
     UTIL.print_start_title("powerOFF Starts")
     
     # 1.Disable Grippers (Only for UPC mode)
     if robotConfig.mode == RI.MODE_DIRECT_UPC:
         if not robot.set_tool_flange_output_voltage("right", RI.TOOL_FLANGE_VOLTAGE_OFF):
-            logging.error("Failed to Disable Right gripper")
+            logging.error("Failed to Disable Right Gripper")
             return False 
         if not robot.set_tool_flange_output_voltage("left", RI.TOOL_FLANGE_VOLTAGE_OFF):
-            logging.error("Failed to Disable Left gripper")
+            logging.error("Failed to Disable Left Gripper")
             return False 
         logging.info("SUCCESS: Disable Grippers!")
     
     # 2.Disable Control Managuer
     if not robot.disable_control_manager():               
-        logging.error("Failed to Disable control manager")
+        logging.error("Failed to Disable the Control Manager")
         return False
-    logging.info("SUCCESS: Enable the control manager!")
+    logging.info("SUCCESS: Disable the Control Manager!")
         
     # 3.Servo OFF
     # if robot.is_servo_on(".*"):                            # Servo Check
@@ -302,8 +308,10 @@ def setLED(robot, rgb, duration, transition_time, blinking, blinking_freq):
     """ 
     if (blinking == False):
         robot.set_led_color(rby.Color(*rgb), duration, transition_time, blinking)
+        time.sleep(duration)
     else:
         robot.set_led_color(rby.Color(*rgb), duration, transition_time, blinking, blinking_freq)
+        time.sleep(duration)
         
         
         
@@ -363,7 +371,7 @@ class Recorder:
         self.save()
         
         
-    def handle_exit(self):
+    def handle_exit(self, sig, frame):
         """ Handler called when the program exits. """
         self.stop_record()
         sys.exit(0)
