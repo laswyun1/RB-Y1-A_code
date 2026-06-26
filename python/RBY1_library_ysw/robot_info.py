@@ -18,6 +18,7 @@ RAD2DEG = 180.0 / np.pi
 DEG2RAD = np.pi / 180.0
 RAD     = "rad"
 DEG     = "deg"
+TICK    = "tick"
 
 
 # =============================================================================
@@ -138,6 +139,21 @@ HEAD_ZERO_POS = [0.0, 0.0]
 GRIPPER_DEVICE_NAME                     = "/dev/rby1_gripper"
 GRIPPER_ID_R                            = 0
 GRIPPER_ID_L                            = 1
+
+# For Homing  
+# Set "Open" as 0-tick and "Closed" has maximum (negative) tick values
+GRIPPER_HOMING_OPEN_CURRENT             = -0.02                 # Unit: A
+GRIPPER_HOMING_CLOSE_CURRENT            = 0.02                  # Unit: A
+GRIPPER_OPEN_POS_RAWTICK_R              = -1965                 # Unit: 32-bit Position Tick    # Raw position tick value when gripper is fully opened 
+GRIPPER_OPEN_POS_RAWTICK_L              = -1948                 # Unit: 32-bit Position Tick    # Raw position tick value when gripper is fully opened 
+GRIPPER_CLOSE_POS_RAWTICK_R             = 899                   # Unit: 32-bit Position Tick    # Raw position tick value when gripper is fully closed (= OFFSET / Set 0-tick)
+GRIPPER_CLOSE_POS_RAWTICK_L             = 992                   # Unit: 32-bit Position Tick    # Raw position tick value when gripper is fully closed (= OFFSET / Set 0-tick)
+GRIPPER_POS_RANGE_TICK_R                = -2864                 # Unit: 32-bit Position Tick    # GRIPPER_OPEN_POS_RAWTICK_R - GRIPPER_CLOSE_POS_RAWTICK_R
+GRIPPER_POS_RANGE_TICK_L                = -2940                 # Unit: 32-bit Position Tick    # GRIPPER_OPEN_POS_RAWTICK_L - GRIPPER_CLOSE_POS_RAWTICK_L
+GRIPPER_POS_RANGE_LINEAR                = 91.0                  # Unit: mm      # Measured by vernier caliper (physically cushion to cushion)
+GRIPPER_POS_SCALE_LINEAR_TO_TICK_R      = int(-2864 / 91.0)     # Unit: tick/mm
+GRIPPER_POS_SCALE_LINEAR_TO_TICK_L      = int(-2940 / 91.0)     # Unit: tick/mm
+
 
 DXL_PROTOCOL_VERSION                    = 2.0
 DXL_BAUDRATE                            = 2000000

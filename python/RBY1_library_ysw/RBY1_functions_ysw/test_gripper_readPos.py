@@ -3,7 +3,7 @@
 # Usage example:
 #       (Remotely connect to Real RBY1-A robot UPC)
 #       Before use this code, Robot should be powered ON
-#       python3 test_gripper_pos.py
+#       python3 test_gripper_readPos.py
 #       Freely move grippers and check angle position streaming
 #       Default(Approximate): Closed(+90 deg), Open(-170 deg)
 #
@@ -46,8 +46,8 @@ gripper.disable(dxl_id=ysw.GRIPPER_ID_L)
 # Streaming angle position
 try:
     while True:
-        deg_R = gripper.read_position_angular(ysw.GRIPPER_ID_R, unit=ysw.DEG, print_log=True)
-        deg_L = gripper.read_position_angular(ysw.GRIPPER_ID_L, unit=ysw.DEG, print_log=True)
+        deg_R = gripper.read_position_angular(ysw.GRIPPER_ID_R, unit=ysw.DEG, homing_use=True, print_log=True)
+        deg_L = gripper.read_position_angular(ysw.GRIPPER_ID_L, unit=ysw.DEG, homing_use=True, print_log=True)
         time.sleep(0.1)
     
 except KeyboardInterrupt:

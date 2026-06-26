@@ -37,6 +37,17 @@ class Gripper:
         self.dxl_L_idx = 1
         self.dxl_activated = []
         
+        self.dxl_R_homing_openTick     = RI.GRIPPER_OPEN_POS_RAWTICK_R
+        self.dxl_L_homing_openTick     = RI.GRIPPER_OPEN_POS_RAWTICK_L
+        self.dxl_R_homing_closeTick    = RI.GRIPPER_CLOSE_POS_RAWTICK_R
+        self.dxl_L_homing_closeTick    = RI.GRIPPER_CLOSE_POS_RAWTICK_L
+        self.dxl_R_homing_rangeTick    = RI.GRIPPER_POS_RANGE_TICK_R
+        self.dxl_L_homing_rangeTick    = RI.GRIPPER_POS_RANGE_TICK_L
+        self.dxl_R_homing_LinearToTick = RI.GRIPPER_POS_SCALE_LINEAR_TO_TICK_R
+        self.dxl_L_homing_LinearToTick = RI.GRIPPER_POS_SCALE_LINEAR_TO_TICK_L
+        
+        
+        
     #----------------------------------------------------------------------------
     # Essential Functions (Must be used after creating Gripper Object)
     # ---------------------------------------------------------------------------
@@ -153,14 +164,14 @@ class Gripper:
             return operation_mode    # 0: Current Control, 3: Position Control, 5: Current-based Position Control  
         
         
-    def read_position_angular(self, dxl_id: int, unit=RI.RAD, print_log=True) -> Optional[float]:
+    def read_position_angular(self, dxl_id: int, unit=RI.RAD, homing_use=True, print_log=True) -> Optional[float]:
         """
             Read current Angle Position  
             Default Gripper Range(Approximation): -170deg(open) ~ +90deg(closed) 
             [Ex] gripper.read_position_angular(dxl_id=ysw.GRIPPER_ID_R, unit=ysw.DEG, print_log=True)
             
             Return:
-                angle position (unit = radian or degree)
+                [DXL_position_tick, angle position] (unit = radian or degree)
         """  
         val, dxl_comm_res, dxl_err = self.packet_hdlr.read4ByteTxRx(
             self.port_hdlr,
@@ -179,8 +190,17 @@ class Gripper:
             if signed_val >= 2**31:
                 signed_val -= 2**32
                 
-            position_rad = float(signed_val) / RI.DXL_RESOLUTION_TICKS_PER_REV * RI.TWO_PI
-            position_deg = position_rad * RI.RAD2DEG
+            # Make Maximum Value(closed state) = 0-tick
+            if homing_use:
+                if dxl_id == RI.GRIPPER_ID_R:       offset_tick = RI.GRIPPER_CLOSE_POS_RAWTICK_R
+                elif dxl_id == RI.GRIPPER_ID_L:     offset_tick = RI.GRIPPER_CLOSE_POS_RAWTICK_L                
+                signed_val -= offset_tick
+                
+            position_tick = signed_val
+            position_rad  = float(signed_val) / RI.DXL_RESOLUTION_TICKS_PER_REV * RI.TWO_PI
+            position_deg  = position_rad * RI.RAD2DEG
+            
+            # Unit Selection
             if (unit == RI.RAD):
                 if print_log == True: 
                     logging.info(f"SUCCESS: [DXL ID:{dxl_id}] position = {position_rad} rad")
@@ -189,6 +209,10 @@ class Gripper:
                 if print_log == True:
                     logging.info(f"SUCCESS: [DXL ID:{dxl_id}] position = {position_deg} deg")
                 return position_deg    # [deg]
+            elif (unit == RI.TICK):
+                if print_log == True:
+                    logging.info(f"SUCCESS: [DXL ID:{dxl_id}] position = {position_tick} tick")
+                return position_tick    # [tick]
             
             
     def read_current_ampere(self, dxl_id: int) -> Optional[float]:    
@@ -397,8 +421,19 @@ class Gripper:
         else:
             logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Current Limit: {current_limit_A}A")
             return True
+        
+        
+        
+    #----------------------------------------------------------------------------
+    # Calculation Functions
+    # ---------------------------------------------------------------------------
+    def convert_pos_from_tick(self, pos_tick: float, unit=RI.RAD):
+        if unit == RI.RAD:      pos = pos_tick / RI.DXL_RESOLUTION_TICKS_PER_REV * RI.TWO_PI
+        elif unit == RI.DEG:    pos = pos_tick / RI.DXL_RESOLUTION_TICKS_PER_REV * RI.TWO_PI * RI.RAD2DEG
+        return pos
             
             
+
     #----------------------------------------------------------------------------
     # Utility Functions (Mainly used)
     # ---------------------------------------------------------------------------
@@ -462,3 +497,89 @@ class Gripper:
 
         UTIL.print_end_title(f"Gripper [DXL ID:{dxl_id}] Disable is Done")
         return True
+    
+    
+    def homing(self, dxl_id=None, iter=100) -> bool:
+        """
+            Homing the DXL Angle Position Value
+            After use this, Change the "robot_info.py" file 
+                GRIPPER_OPEN_POS_RAWTICK_R
+                GRIPPER_OPEN_POS_RAWTICK_L
+                GRIPPER_CLOSE_POS_RAWTICK_R
+                GRIPPER_CLOSE_POS_RAWTICK_L
+                GRIPPER_POS_RANGE_TICK_R
+                GRIPPER_POS_RANGE_TICK_L
+                GRIPPER_POS_SCALE_TICK_TO_LINEAR_R
+                GRIPPER_POS_SCALE_TICK_TO_LINEAR_L
+            [Ex] gripper.homing(dxl_id=ysw.GRIPPER_ID_R, iter=50)
+            
+            Return:
+                True: Homing success
+                False: Error
+        """
+        UTIL.print_start_title(f"Gripper [DXL ID:{dxl_id}] Homing Starts")
+
+        if (dxl_id is None) or (dxl_id not in [RI.GRIPPER_ID_R, RI.GRIPPER_ID_L]):
+            logging.error("Invalid DXL ID")
+            return False
+
+        if dxl_id not in self.dxl_activated:
+            logging.error(f"[DXL ID:{dxl_id}] is NOT activated")
+            return False
+
+        # 1. initialize_setting
+        self.initialize_setting(dxl_id=dxl_id, operation_mode=RI.DXL_CURRENT_CONTROL_MODE)
+        
+        # 2. OPEN
+        UTIL.print_start_subtitle(f"Gripper [DXL ID:{dxl_id}] OPEN Iteration Starts")
+        posTick_open_list = []
+        self.write_current_ampere(dxl_id=dxl_id, current_ampere=RI.GRIPPER_HOMING_OPEN_CURRENT)
+        time.sleep(5)
+        
+        for i in range(iter):
+            temp_posTick_open = self.read_position_angular(dxl_id=dxl_id, unit=RI.TICK, homing_use=False, print_log=True)    # homing_use should be False!
+            posTick_open_list.append(temp_posTick_open)
+        
+        if dxl_id == RI.GRIPPER_ID_R:     self.dxl_R_homing_openTick = int(UTIL.average_list(posTick_open_list))    
+        elif dxl_id == RI.GRIPPER_ID_L:   self.dxl_L_homing_openTick = int(UTIL.average_list(posTick_open_list))
+        UTIL.print_end_subtitle(f"Gripper [DXL ID:{dxl_id}] OPEN Iteration Ends")
+        
+        # 3. CLOSE
+        UTIL.print_start_subtitle(f"Gripper [DXL ID:{dxl_id}] CLOSE Iteration Starts")
+        posTick_close_list = []
+        self.write_current_ampere(dxl_id=dxl_id, current_ampere=RI.GRIPPER_HOMING_CLOSE_CURRENT)
+        time.sleep(5)
+        
+        for i in range(iter):
+            temp_posTick_close = self.read_position_angular(dxl_id=dxl_id, unit=RI.TICK, homing_use=False, print_log=True)   # homing_use should be False!
+            posTick_close_list.append(temp_posTick_close)
+        
+        if dxl_id == RI.GRIPPER_ID_R:     self.dxl_R_homing_closeTick = int(UTIL.average_list(posTick_close_list))     
+        elif dxl_id == RI.GRIPPER_ID_L:   self.dxl_L_homing_closeTick = int(UTIL.average_list(posTick_close_list))
+        UTIL.print_end_subtitle(f"Gripper [DXL ID:{dxl_id}] CLOSE Iteration Ends")
+        
+        # 4. Disable Torque Mode
+        self.disable(dxl_id=dxl_id)
+        
+        # 5. Calculate Angle Position Range
+        if dxl_id == RI.GRIPPER_ID_R:     
+            self.dxl_R_homing_rangeTick = int(self.dxl_R_homing_openTick - self.dxl_R_homing_closeTick)
+            self.dxl_R_homing_LinearToTick = self.dxl_R_homing_rangeTick / RI.GRIPPER_POS_RANGE_LINEAR
+        elif dxl_id == RI.GRIPPER_ID_L:   
+            self.dxl_L_homing_rangeTick = int(self.dxl_L_homing_openTick - self.dxl_L_homing_closeTick)
+            self.dxl_L_homing_LinearToTick = self.dxl_L_homing_rangeTick / RI.GRIPPER_POS_RANGE_LINEAR
+        
+        # 6. Print Homing Results
+        if (dxl_id == RI.GRIPPER_ID_R):
+            print(f"Gripper [DXL ID:{dxl_id}] OPEN Raw Position Tick: {self.dxl_R_homing_openTick} tick")
+            print(f"Gripper [DXL ID:{dxl_id}] CLOSE Raw Position Tick: {self.dxl_R_homing_closeTick} tick")
+            print(f"Gripper [DXL ID:{dxl_id}] Tick Range: {self.dxl_R_homing_rangeTick} tick")
+        elif (dxl_id == RI.GRIPPER_ID_L):
+            print(f"Gripper [DXL ID:{dxl_id}] OPEN Raw Position Tick: {self.dxl_L_homing_openTick} tick")
+            print(f"Gripper [DXL ID:{dxl_id}] CLOSE Raw Position Tick: {self.dxl_L_homing_closeTick} tick")
+            print(f"Gripper [DXL ID:{dxl_id}] Tick Range: {self.dxl_L_homing_rangeTick} tick")
+        
+        UTIL.print_end_title(f"Gripper [DXL ID:{dxl_id}] Homing is Done")
+        return True
+    
+    
