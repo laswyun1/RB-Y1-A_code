@@ -1,4 +1,4 @@
-# Test Right/Left Gripper Motions
+# Test Right/Left Gripper Motions by Current Control
 # 
 # Usage example:
 #       (Remotely connect to Real RBY1-A robot UPC)
@@ -36,11 +36,16 @@ gripper = ysw.Gripper()
 gripper.connect(device_name=ysw.GRIPPER_DEVICE_NAME, protocol_version=ysw.DXL_PROTOCOL_VERSION, baudrate=ysw.DXL_BAUDRATE)
 gripper.test_ping()
 
-for dxl_id in gripper.dxl_activated:
-    gripper.write_torque_mode(dxl_id=dxl_id, torque_mode=ysw.DXL_TORQUE_DISABLE)
-    gripper.write_current_limit(dxl_id=dxl_id, current_limit_A=ysw.DXL_CURRENT_LIMIT_MAX_A)
-    gripper.write_operation_mode(dxl_id=dxl_id, operation_mode=ysw.DXL_CURRENT_CONTROL_MODE)
-    gripper.write_torque_mode(dxl_id=dxl_id, torque_mode=ysw.DXL_TORQUE_ENABLE)
+### Initial setting method 1
+# for dxl_id in gripper.dxl_activated:
+#     gripper.write_torque_mode(dxl_id=dxl_id, torque_mode=ysw.DXL_TORQUE_DISABLE)
+#     gripper.write_current_limit(dxl_id=dxl_id, current_limit_A=ysw.DXL_CURRENT_LIMIT_MAX_A)
+#     gripper.write_operation_mode(dxl_id=dxl_id, operation_mode=ysw.DXL_CURRENT_CONTROL_MODE)
+#     gripper.write_torque_mode(dxl_id=dxl_id, torque_mode=ysw.DXL_TORQUE_ENABLE)
+    
+### Initial setting method 2
+gripper.initialize_setting(dxl_id=ysw.GRIPPER_ID_R, operation_mode=ysw.DXL_CURRENT_CONTROL_MODE)
+gripper.initialize_setting(dxl_id=ysw.GRIPPER_ID_L, operation_mode=ysw.DXL_CURRENT_CONTROL_MODE)    
     
 trial = 5
 for i in range(trial):
