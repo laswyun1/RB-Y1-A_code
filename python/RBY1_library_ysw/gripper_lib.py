@@ -79,6 +79,7 @@ class Gripper:
             return False
 
 
+
     def test_ping(self) -> bool:
         """
             Connection Test function (Optioinal)
@@ -106,6 +107,7 @@ class Gripper:
                 
         UTIL.print_end_title("Gripper Ping Test is Done")
         return True
+                
                 
                 
     #----------------------------------------------------------------------------
@@ -137,6 +139,7 @@ class Gripper:
             return torque_mode    # 0: Disabled, 1: Enabled   
         
         
+        
     def read_operation_mode(self, dxl_id: int) -> Optional[int]:
         """
             Read Operation Mode State  
@@ -163,6 +166,7 @@ class Gripper:
             operation_mode = val
             logging.info(f"[DXL ID:{dxl_id}] SUCCESS: operation mode = {operation_mode}")
             return operation_mode    # 0: Current Control, 3: Position Control, 5: Current-based Position Control  
+        
         
         
     def read_position_angular(self, dxl_id: int, unit=RI.RAD, homing_use=True, print_log=True) -> Optional[float]:
@@ -216,6 +220,7 @@ class Gripper:
                 return position_tick    # [tick]
             
             
+            
     def read_current_ampere(self, dxl_id: int) -> Optional[float]:    
         """
             Read Current value (unit = A) 
@@ -239,6 +244,7 @@ class Gripper:
             current_A = float(val) * RI.DXL_AMPERE_PER_UNIT 
             logging.info(f"SUCCESS: [DXL ID:{dxl_id}] current = {current_A}A")
             return current_A     # [A]
+        
         
         
     def read_current_limit(self, dxl_id: int) -> Optional[float]:  
@@ -267,6 +273,7 @@ class Gripper:
             logging.info(f"SUCCESS: [DXL ID:{dxl_id}] current_limit_raw(0~1193) = {current_limit_raw}, current_limit_A = {current_limit_A}A")
             return current_limit_A     # [A]     
         
+         
          
     #----------------------------------------------------------------------------
     # Register Write Functions
@@ -297,6 +304,7 @@ class Gripper:
             elif (torque_mode == RI.DXL_TORQUE_ENABLE):     logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Torque is Enabled")
             return True
                 
+   
    
     def write_operation_mode(self, dxl_id: int, operation_mode: int) -> bool:
         """
@@ -334,6 +342,7 @@ class Gripper:
             return True  
             
 
+
     def write_current_ampere(self, dxl_id: int, current_ampere: float) -> bool:
         """
             Apply Current value (unit = A)
@@ -362,6 +371,7 @@ class Gripper:
         else:
             logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Current [{current_ampere} A]")
             return True
+
 
 
     def write_current_ampere_safety(self, dxl_id: int, current_ampere: float):        
@@ -396,6 +406,7 @@ class Gripper:
             print(f"[DXL ID]:{dxl_id} Retry...")
             
 
+
     def write_current_limit(self, dxl_id: int, current_limit_A: float) -> bool:        
         """
             Set Current Limit(Max) (unit = A)
@@ -425,6 +436,7 @@ class Gripper:
             logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Current Limit: {current_limit_A}A")
             return True
         
+    
     
     def write_goalPosition_tick(self, dxl_id: int, goalPos_tick: int) -> bool:        
         """
@@ -475,6 +487,7 @@ class Gripper:
             return True
         
         
+        
     #----------------------------------------------------------------------------
     # Calculation Functions
     # ---------------------------------------------------------------------------
@@ -521,6 +534,7 @@ class Gripper:
             return False
         
         
+        
     def disable(self, dxl_id=None) -> bool:
         """
             Disable Torque mode of Gripper (Free to move by external force)
@@ -548,6 +562,7 @@ class Gripper:
 
         UTIL.print_end_title(f"Gripper [DXL ID:{dxl_id}] Disable is Done")
         return True
+    
     
     
     def homing(self, dxl_id=None, iter=100) -> bool:
@@ -632,6 +647,7 @@ class Gripper:
         
         UTIL.print_end_title(f"Gripper [DXL ID:{dxl_id}] Homing is Done")
         return True
+    
     
     
     def position_control_linear(self, dxl_id: int, linear_pos: float) -> bool:
