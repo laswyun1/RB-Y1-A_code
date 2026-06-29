@@ -145,6 +145,7 @@ class Gripper:
             Return:
                 0: Current Control
                 3: Position Control
+                4: Extended Position Control
                 5: Current-based Position Control
         """  
         val, dxl_comm_res, dxl_err = self.packet_hdlr.read1ByteTxRx(
@@ -325,6 +326,8 @@ class Gripper:
                 logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Postion Control Mode")
             elif (operation_mode == RI.DXL_CURRENT_BASED_POSITION_CONTROL_MODE):   
                 logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set (Current + Postion) Control Mode")
+            elif (operation_mode == RI.DXL_EXTENDED_POSITION_CONTROL_MODE):   
+                logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Extended Position Control Mode")
             else:   
                 logging.error(f"Invalid DXL Operation Mode")  
                 return False
@@ -422,6 +425,54 @@ class Gripper:
             logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Current Limit: {current_limit_A}A")
             return True
         
+    
+    def write_goalPosition_tick(self, dxl_id: int, goalPos_tick: int) -> bool:        
+        """
+            Write Goal Position using raw tick value.
+            This is absolute Dynamixel Goal Position value.
+            This is for "Extended Position Control Mode" 
+            [Ex] gripper.write_goalPosition_tick(ysw.GRIPPER_ID_R, 1023)
+            [Ex] gripper.write_goalPosition_tick(ysw.GRIPPER_ID_R, -2000)
+            
+            Return: 
+                True: OK
+                False: Error
+        """  
+        goalPos_tick_signed = int(goalPos_tick)
+        
+        # Clamping Min/Max Values
+        if (dxl_id == RI.GRIPPER_ID_R):
+            if (goalPos_tick_signed > RI.GRIPPER_CLOSE_POS_RAWTICK_R):
+                goalPos_tick_signed = RI.GRIPPER_CLOSE_POS_RAWTICK_R
+            elif (goalPos_tick_signed < RI.GRIPPER_OPEN_POS_RAWTICK_R):
+                goalPos_tick_signed = RI.GRIPPER_OPEN_POS_RAWTICK_R
+        if (dxl_id == RI.GRIPPER_ID_L):
+            if (goalPos_tick_signed > RI.GRIPPER_CLOSE_POS_RAWTICK_L):
+                goalPos_tick_signed = RI.GRIPPER_CLOSE_POS_RAWTICK_L
+            elif (goalPos_tick_signed < RI.GRIPPER_OPEN_POS_RAWTICK_L):
+                goalPos_tick_signed = RI.GRIPPER_OPEN_POS_RAWTICK_L
+        
+        # Convert to uint32 
+        goalPos_tick_uint32 = goalPos_tick_signed
+        if goalPos_tick_uint32 < 0:
+            goalPos_tick_uint32 += 2**32
+                    
+        dxl_comm_res, dxl_err = self.packet_hdlr.write4ByteTxRx(
+            self.port_hdlr,
+            dxl_id,
+            RI.DXL_ADDR_GOAL_POSITION,
+            int(goalPos_tick_uint32)
+        )
+        if dxl_comm_res != RI.DXL_COMM_SUCCESS:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getTxRxResult(dxl_comm_res)))
+            return False
+        elif dxl_err != RI.DXL_NO_ERROR:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
+            return False
+        else:
+            logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Goal Position [Tick]: " 
+                         f"signed={goalPos_tick_signed}, uint32={goalPos_tick_uint32}")
+            return True
         
         
     #----------------------------------------------------------------------------
@@ -583,3 +634,51 @@ class Gripper:
         return True
     
     
+    def position_control_linear(self, dxl_id: int, linear_pos: float) -> bool:
+        """
+            Move gripper using linear position.
+            MUST Use "Extended Position Control Mode(4)" of Grippers
+            Unit: [mm]
+            
+            linear_pos:
+                0.0  -> closed
+                91.0 -> open
+                
+            [Ex]
+                gripper.position_control_linear(ysw.GRIPPER_ID_R, 0.0)   # close
+                gripper.position_control_linear(ysw.GRIPPER_ID_R, 91.0)  # open
+                gripper.position_control_linear(ysw.GRIPPER_ID_R, GRIPPER_POS_RANGE_LINEAR)  # Open
+        """
+        UTIL.print_start_title(f"Gripper [DXL ID:{dxl_id}] Position Control Starts")
+        print(f"Desired Linear Position = {linear_pos}mm")
+        
+        if (dxl_id is None) or (dxl_id not in [RI.GRIPPER_ID_R, RI.GRIPPER_ID_L]):
+            logging.error("Invalid DXL ID")
+            return False
+
+        if dxl_id not in self.dxl_activated:
+            logging.error(f"[DXL ID:{dxl_id}] is NOT activated")
+            return False
+        
+        # Clamp 0.0(Closed) to maximum value(=91mm, Open)
+        if (linear_pos < 0):
+            print("Position cannot be less than 0[mm]")
+            print("Thus, Min value(CLOSED) is applied: 0[mm]")
+        elif (linear_pos > RI.GRIPPER_POS_RANGE_LINEAR):
+            print(f"Position cannot be larger than {RI.GRIPPER_POS_RANGE_LINEAR}[mm]")
+            print(f"Thus, Max value(OPEN) is applied: {RI.GRIPPER_POS_RANGE_LINEAR}[mm]")
+        desired_pos_linear = max(0.0, min(linear_pos, RI.GRIPPER_POS_RANGE_LINEAR))
+        
+        if dxl_id == RI.GRIPPER_ID_R:
+            desired_pos_tick = desired_pos_linear * RI.GRIPPER_POS_SCALE_LINEAR_TO_TICK_R
+            offset_tick = RI.GRIPPER_CLOSE_POS_RAWTICK_R
+        elif dxl_id == RI.GRIPPER_ID_L:
+            desired_pos_tick = desired_pos_linear * RI.GRIPPER_POS_SCALE_LINEAR_TO_TICK_L
+            offset_tick = RI.GRIPPER_CLOSE_POS_RAWTICK_L
+            
+        desired_pos_tick = int(desired_pos_tick + offset_tick)
+        
+        if (self.write_goalPosition_tick(dxl_id=dxl_id, goalPos_tick=desired_pos_tick)):
+            UTIL.print_end_title(f"Gripper [DXL ID:{dxl_id}] Position Control Ends")
+            return True
+        return False 

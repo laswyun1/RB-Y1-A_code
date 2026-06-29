@@ -168,10 +168,12 @@ DXL_ADDR_PRESENT_CURRENT                = 126     # Unit: 2.69mA
 DXL_ADDR_PRESENT_POSITION               = 132     # Unit: 1-pulse(or Tick)
 
 DXL_CURRENT_CONTROL_MODE                = 0
-DXL_POSITION_CONTROL_MODE               = 3 
+DXL_POSITION_CONTROL_MODE               = 3       # It only used for (0~4096) positive tick values (Not suited for RBY1)
+DXL_EXTENDED_POSITION_CONTROL_MODE      = 4       # It is suited for RBY1 gripper position control (raw gripper tick: +900(Close) ~ -1900(Open))
 DXL_CURRENT_BASED_POSITION_CONTROL_MODE = 5
 DXL_CONTROL_MODE                        = [DXL_CURRENT_CONTROL_MODE, 
                                            DXL_POSITION_CONTROL_MODE, 
+                                           DXL_EXTENDED_POSITION_CONTROL_MODE,  
                                            DXL_CURRENT_BASED_POSITION_CONTROL_MODE]
 
 DXL_TORQUE_DISABLE                      = 0

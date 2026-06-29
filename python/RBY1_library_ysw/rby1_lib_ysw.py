@@ -16,8 +16,8 @@ def setupLogging(level=logging.INFO):
     """logging이 매번 보이게 설정"""
     logging.basicConfig(
         level=level,
-        # format="[%(levelname)s] %(message)s",
-        format="%(asctime)s [%(levelname)s] %(message)s",
+        format="[%(levelname)s] %(message)s",
+        # format="%(asctime)s [%(levelname)s] %(message)s",
         stream=sys.stdout,
         force=True,
     )

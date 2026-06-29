@@ -1,9 +1,9 @@
-# Move to ZERO Posture
+# Move to READY Posture
 # 
 # Usage example:
 #       (Remotely connect to Real RBY1-A robot UPC)
 #       Before use this code, Robot should be powered ON
-#       python3 poseZero.py
+#       python3 pose_ready.py
 #
 # Copyright (c) 2026 Precision Mechatronics Laboratory, KAIST. All rights reserved.
 # Author: Seungwon Yun
@@ -28,6 +28,6 @@ ysw.setupLogging()
 robotConfig = ysw.setRobotConfig(ysw.MODE_DIRECT_UPC, ysw.MODEL_A)
 robot = ysw.initialize(robotConfig.mode, robotConfig.address, robotConfig.model, option=ysw.CONNECT_ONLY)
 
-print("[Posture: ZERO] Starts")
-ysw.move_position_22dof(robot, ysw.ZERO_POS, minimum_time=5.0, control_hold_time=0.5, get_return=True)
-print("[Posture: ZERO] Ends")
+print("[Posture: READY] Starts")
+ysw.move_position_22dof(robot, ysw.READY_POS, minimum_time=5.0, control_hold_time=0.5, get_return=True)
+print("[Posture: READY] Ends")

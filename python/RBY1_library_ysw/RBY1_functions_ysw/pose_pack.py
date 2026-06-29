@@ -3,7 +3,7 @@
 # Usage example:
 #       (Remotely connect to Real RBY1-A robot UPC)
 #       Before use this code, Robot should be powered ON
-#       python3 posePack.py
+#       python3 pose_pack.py
 #
 # Copyright (c) 2026 Precision Mechatronics Laboratory, KAIST. All rights reserved.
 # Author: Seungwon Yun
