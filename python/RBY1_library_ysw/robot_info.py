@@ -19,6 +19,8 @@ DEG2RAD = np.pi / 180.0
 RAD     = "rad"
 DEG     = "deg"
 TICK    = "tick"
+MM      = "mm"
+POSITION_UNIT = [RAD, DEG, TICK, MM]
 
 
 # =============================================================================
@@ -121,7 +123,10 @@ READY_DEMO_POS = {"torso":     np.deg2rad([0.0, 45.0, -90.0,   45.0, 0.0,  0.0])
                   "left_arm":  np.deg2rad([0.0,  5.0,   0.0, -130.0, 0.0, 60.0, -90.0]),
                   "head":      np.deg2rad([0.0, 30.0])}
 
-
+GRIPPER_DEBUG_POS = {"torso":     np.deg2rad([0.0, 80.0, -140.0,   60.0, 0.0,   0.0]),
+                     "right_arm": np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0, -20.0, 0.0]),
+                     "left_arm":  np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0, -20.0, 0.0]),
+                     "head":      np.deg2rad([0.0, 0.0])}
 
 # =============================================================================
 # 2-DoF Joint Position for (Head) Postures [0: Yaw, 1: Pitch]
@@ -145,14 +150,14 @@ GRIPPER_ID_L                            = 1
 GRIPPER_HOMING_OPEN_CURRENT             = -0.02                 # Unit: A
 GRIPPER_HOMING_CLOSE_CURRENT            = 0.02                  # Unit: A
 GRIPPER_OPEN_POS_RAWTICK_R              = -1965                 # Unit: 32-bit Position Tick    # Raw position tick value when gripper is fully opened 
-GRIPPER_OPEN_POS_RAWTICK_L              = -1948                 # Unit: 32-bit Position Tick    # Raw position tick value when gripper is fully opened 
+GRIPPER_OPEN_POS_RAWTICK_L              = -925                  # Unit: 32-bit Position Tick    # Raw position tick value when gripper is fully opened 
 GRIPPER_CLOSE_POS_RAWTICK_R             = 899                   # Unit: 32-bit Position Tick    # Raw position tick value when gripper is fully closed (= OFFSET / Set 0-tick)
-GRIPPER_CLOSE_POS_RAWTICK_L             = 992                   # Unit: 32-bit Position Tick    # Raw position tick value when gripper is fully closed (= OFFSET / Set 0-tick)
+GRIPPER_CLOSE_POS_RAWTICK_L             = 2015                  # Unit: 32-bit Position Tick    # Raw position tick value when gripper is fully closed (= OFFSET / Set 0-tick)
 GRIPPER_POS_RANGE_TICK_R                = -2864                 # Unit: 32-bit Position Tick    # GRIPPER_OPEN_POS_RAWTICK_R - GRIPPER_CLOSE_POS_RAWTICK_R
 GRIPPER_POS_RANGE_TICK_L                = -2940                 # Unit: 32-bit Position Tick    # GRIPPER_OPEN_POS_RAWTICK_L - GRIPPER_CLOSE_POS_RAWTICK_L
 GRIPPER_POS_RANGE_LINEAR                = 91.0                  # Unit: mm      # Measured by vernier caliper (physically cushion to cushion)
-GRIPPER_POS_SCALE_LINEAR_TO_TICK_R      = int(-2864 / 91.0)     # Unit: tick/mm
-GRIPPER_POS_SCALE_LINEAR_TO_TICK_L      = int(-2940 / 91.0)     # Unit: tick/mm
+GRIPPER_POS_SCALE_LINEAR_TO_TICK_R      = int(GRIPPER_POS_RANGE_TICK_R / 91.0)     # Unit: tick/mm
+GRIPPER_POS_SCALE_LINEAR_TO_TICK_L      = int(GRIPPER_POS_RANGE_TICK_L / 91.0)     # Unit: tick/mm
 
 
 DXL_PROTOCOL_VERSION                    = 2.0
@@ -169,8 +174,8 @@ DXL_ADDR_PRESENT_POSITION               = 132     # Unit: 1-pulse(or Tick)
 
 DXL_CURRENT_CONTROL_MODE                = 0
 DXL_POSITION_CONTROL_MODE               = 3       # It only used for (0~4096) positive tick values (Not suited for RBY1)
-DXL_EXTENDED_POSITION_CONTROL_MODE      = 4       # It is suited for RBY1 gripper position control (raw gripper tick: +900(Close) ~ -1900(Open))
-DXL_CURRENT_BASED_POSITION_CONTROL_MODE = 5
+DXL_EXTENDED_POSITION_CONTROL_MODE      = 4       # It is NOT suited for RBY1 gripper position control (Current Limit value is NOT ensured)
+DXL_CURRENT_BASED_POSITION_CONTROL_MODE = 5       # It is SUITED for RBY1 Gripper Position Control (raw gripper tick: [about +900(Close)] ~ [about -1900(Open)])
 DXL_CONTROL_MODE                        = [DXL_CURRENT_CONTROL_MODE, 
                                            DXL_POSITION_CONTROL_MODE, 
                                            DXL_EXTENDED_POSITION_CONTROL_MODE,  
@@ -184,8 +189,12 @@ DXL_MAX_POS_VALUE                       = 4095
 DXL_RESOLUTION_TICKS_PER_REV            = 4096.0
 DXL_AMPERE_PER_UNIT                     = 0.00269    # 1-unit = 2.69mA
 
-DXL_CURRENT_LIMIT_MAX_A                 = 3.2               # Unit: A
-DXL_CURRENT_LIMIT_MAX_RAW               = 1193              # Unit: 2.69mA
+DXL_CURRENT_LIMIT_MAX_A_DEFAULT         = 3.2               # Unit: A           (Never USE this)
+DXL_CURRENT_LIMIT_MAX_RAW_DEFAULT       = 1193              # Unit: 2.69mA      (Never USE this)
+DXL_CURRENT_LIMIT_MAX_A_RAINBOW         = 0.6725            # Unit: A           (Maximum USE this)
+DXL_CURRENT_LIMIT_MAX_RAW_RAINBOW       = 250               # Unit: 2.69mA      (Maximum USE this)
+DXL_CURRENT_LIMIT_MAX_A_YSW             = 0.1345            # Unit: A           (USE this)           
+DXL_CURRENT_LIMIT_MAX_RAW_YSW           = 50                # Unit: 2.69mA      (Use this)
 
 DXL_COMM_SUCCESS                        = 0
 DXL_NO_ERROR                            = 0

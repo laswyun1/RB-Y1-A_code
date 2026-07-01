@@ -39,7 +39,7 @@ gripper.test_ping()
 ### Initial setting method 1
 # for dxl_id in gripper.dxl_activated:
 #     gripper.write_torque_mode(dxl_id=dxl_id, torque_mode=ysw.DXL_TORQUE_DISABLE)
-#     gripper.write_current_limit(dxl_id=dxl_id, current_limit_A=ysw.DXL_CURRENT_LIMIT_MAX_A)
+# #   gripper.write_current_limit(dxl_id=dxl_id, current_limit_A=ysw.DXL_CURRENT_LIMIT_MAX_A_GRIPPER)
 #     gripper.write_operation_mode(dxl_id=dxl_id, operation_mode=ysw.DXL_CURRENT_CONTROL_MODE)
 #     gripper.write_torque_mode(dxl_id=dxl_id, torque_mode=ysw.DXL_TORQUE_ENABLE)
     
@@ -56,5 +56,9 @@ for i in range(trial):
     gripper.write_current_ampere(ysw.GRIPPER_ID_R, 0.02)
     gripper.write_current_ampere(ysw.GRIPPER_ID_L, 0.02)
     time.sleep(2)
+    
+### Deactivation After Test
+gripper.disable(ysw.GRIPPER_ID_R)
+gripper.disable(ysw.GRIPPER_ID_L)
 
 print("[Gripper Test] Ends")

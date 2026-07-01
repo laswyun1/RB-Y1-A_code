@@ -169,14 +169,14 @@ class Gripper:
         
         
         
-    def read_position_angular(self, dxl_id: int, unit=RI.RAD, homing_use=True, print_log=True) -> Optional[float]:
+    def read_position(self, dxl_id: int, unit=RI.RAD, homing_use=True, print_log=True) -> Optional[float]:
         """
-            Read current Angle Position  
+            Read current position  
             Default Gripper Range(Approximation): -170deg(open) ~ +90deg(closed) 
-            [Ex] gripper.read_position_angular(dxl_id=ysw.GRIPPER_ID_R, unit=ysw.DEG, print_log=True)
+            [Ex] gripper.read_position(dxl_id=ysw.GRIPPER_ID_R, unit=ysw.DEG, print_log=True)
             
             Return:
-                [DXL_position_tick, angle position] (unit = radian or degree)
+                angle position (unit = radian / degree / tick / mm)
         """  
         val, dxl_comm_res, dxl_err = self.packet_hdlr.read4ByteTxRx(
             self.port_hdlr,
@@ -197,14 +197,20 @@ class Gripper:
                 
             # Make Maximum Value(closed state) = 0-tick
             if homing_use:
-                if dxl_id == RI.GRIPPER_ID_R:       offset_tick = RI.GRIPPER_CLOSE_POS_RAWTICK_R
-                elif dxl_id == RI.GRIPPER_ID_L:     offset_tick = RI.GRIPPER_CLOSE_POS_RAWTICK_L                
+                if dxl_id == RI.GRIPPER_ID_R:       
+                    offset_tick = RI.GRIPPER_CLOSE_POS_RAWTICK_R 
+                    mm_per_tick_scale =  1.0 / float(RI.GRIPPER_POS_SCALE_LINEAR_TO_TICK_R)       
+                elif dxl_id == RI.GRIPPER_ID_L:     
+                    offset_tick = RI.GRIPPER_CLOSE_POS_RAWTICK_L  
+                    mm_per_tick_scale =  1.0 / float(RI.GRIPPER_POS_SCALE_LINEAR_TO_TICK_L)                
                 signed_val -= offset_tick
                 
             position_tick = signed_val
             position_rad  = float(signed_val) / RI.DXL_RESOLUTION_TICKS_PER_REV * RI.TWO_PI
             position_deg  = position_rad * RI.RAD2DEG
-            
+            if homing_use:
+                position_mm = position_tick * mm_per_tick_scale
+                            
             # Unit Selection
             if (unit == RI.RAD):
                 if print_log == True: 
@@ -218,6 +224,14 @@ class Gripper:
                 if print_log == True:
                     logging.info(f"SUCCESS: [DXL ID:{dxl_id}] position = {position_tick} tick")
                 return position_tick    # [tick]
+            elif (unit == RI.MM):
+                if (homing_use == True):
+                    if print_log == True:
+                        logging.info(f"SUCCESS: [DXL ID:{dxl_id}] position = {position_mm} mm")
+                    return position_mm    # [mm]   
+                else:
+                    logging.error("For [mm] unit, homing must be used")
+                    return None
             
             
             
@@ -332,10 +346,10 @@ class Gripper:
                 logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Current Control Mode")
             elif (operation_mode == RI.DXL_POSITION_CONTROL_MODE):                 
                 logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Postion Control Mode")
-            elif (operation_mode == RI.DXL_CURRENT_BASED_POSITION_CONTROL_MODE):   
-                logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set (Current + Postion) Control Mode")
             elif (operation_mode == RI.DXL_EXTENDED_POSITION_CONTROL_MODE):   
                 logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Extended Position Control Mode")
+            elif (operation_mode == RI.DXL_CURRENT_BASED_POSITION_CONTROL_MODE):   
+                logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Current-based Position Control Mode")
             else:   
                 logging.error(f"Invalid DXL Operation Mode")  
                 return False
@@ -355,7 +369,15 @@ class Gripper:
                 True: OK
                 False: Error
         """      
-        current_value = int(current_ampere / RI.DXL_AMPERE_PER_UNIT)
+        current_ampere_revised = current_ampere
+        
+        if (current_ampere > 0.6725):
+            logging.info(f"[DXL ID:%d] Current MUST be less than 672.5mA")
+            logging.info(f"[DXL ID:%d] Thus, Maximum Currentt(672.5mA) is applied")
+            current_ampere_revised = 0.6725
+            
+        current_value = int(current_ampere_revised / RI.DXL_AMPERE_PER_UNIT)
+        
         dxl_comm_res, dxl_err = self.packet_hdlr.write2ByteTxRx(
             self.port_hdlr,
             dxl_id,
@@ -369,7 +391,7 @@ class Gripper:
             logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
             return False
         else:
-            logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Current [{current_ampere} A]")
+            logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Current [{current_ampere_revised} A]")
             return True
 
 
@@ -411,14 +433,19 @@ class Gripper:
         """
             Set Current Limit(Max) (unit = A)
             Raw value Range (0~1193)
-            [Ex] gripper.write_current_limit(ysw.GRIPPER_ID_R, ysw.DXL_CURRENT_LIMIT_MAX_A)
+            (Caution!): Default value is 1193(=3.2A) by ROBOTIS, But RAINBOW ROBOTICS limits it as 250(672.5mA)
+            You NEVER use this function, because current limit setting is already done by RAINBOW ROBOTICS
+            [Ex] gripper.write_current_limit(ysw.GRIPPER_ID_R, ysw.DXL_CURRENT_LIMIT_MAX_A_YSW)
             
             Return: 
                 True: OK
                 False: Error
         """  
         current_limit_raw = int(current_limit_A / RI.DXL_AMPERE_PER_UNIT)
-        if  (current_limit_raw > 1193):     current_limit_raw = 1193
+        if (current_limit_raw > 250):     
+            logging.info("Current Limint CANNOT be larger than 672.5mA")
+            logging.info("Thus, Current limit is set to 672.5mA")
+            current_limit_raw = 250
 
         dxl_comm_res, dxl_err = self.packet_hdlr.write2ByteTxRx(
             self.port_hdlr,
@@ -440,11 +467,11 @@ class Gripper:
     
     def write_goalPosition_tick(self, dxl_id: int, goalPos_tick: int) -> bool:        
         """
-            Write Goal Position using raw tick value.
-            This is absolute Dynamixel Goal Position value.
-            This is for "Extended Position Control Mode" 
-            [Ex] gripper.write_goalPosition_tick(ysw.GRIPPER_ID_R, 1023)
-            [Ex] gripper.write_goalPosition_tick(ysw.GRIPPER_ID_R, -2000)
+            Write Goal Position using Raw Tick value. (without offset)
+            This is Absolute Dynamixel Goal Position(tick) value.
+            This is for "Current-based Position Control Mode" 
+            [Ex] gripper.write_goalPosition_tick(ysw.GRIPPER_ID_R, 300)
+            [Ex] gripper.write_goalPosition_tick(ysw.GRIPPER_ID_R, -200)
             
             Return: 
                 True: OK
@@ -518,7 +545,7 @@ class Gripper:
             return False
         if dxl_id in self.dxl_activated:
             self.write_torque_mode(dxl_id=dxl_id, torque_mode=RI.DXL_TORQUE_DISABLE)
-            self.write_current_limit(dxl_id=dxl_id, current_limit_A=RI.DXL_CURRENT_LIMIT_MAX_A)
+            # self.write_current_limit(dxl_id=dxl_id, current_limit_A=RI.DXL_CURRENT_LIMIT_MAX_A_YSW)  # You Never use this (You don't need to set current limit)
             
             if operation_mode in RI.DXL_CONTROL_MODE:
                 self.write_operation_mode(dxl_id=dxl_id, operation_mode=operation_mode)
@@ -603,7 +630,7 @@ class Gripper:
         time.sleep(5)
         
         for i in range(iter):
-            temp_posTick_open = self.read_position_angular(dxl_id=dxl_id, unit=RI.TICK, homing_use=False, print_log=True)    # homing_use should be False!
+            temp_posTick_open = self.read_position(dxl_id=dxl_id, unit=RI.TICK, homing_use=False, print_log=True)    # homing_use should be False!
             posTick_open_list.append(temp_posTick_open)
         
         if dxl_id == RI.GRIPPER_ID_R:     self.dxl_R_homing_openTick = int(UTIL.average_list(posTick_open_list))    
@@ -617,7 +644,7 @@ class Gripper:
         time.sleep(5)
         
         for i in range(iter):
-            temp_posTick_close = self.read_position_angular(dxl_id=dxl_id, unit=RI.TICK, homing_use=False, print_log=True)   # homing_use should be False!
+            temp_posTick_close = self.read_position(dxl_id=dxl_id, unit=RI.TICK, homing_use=False, print_log=True)   # homing_use should be False!
             posTick_close_list.append(temp_posTick_close)
         
         if dxl_id == RI.GRIPPER_ID_R:     self.dxl_R_homing_closeTick = int(UTIL.average_list(posTick_close_list))     
@@ -640,32 +667,45 @@ class Gripper:
             print(f"Gripper [DXL ID:{dxl_id}] OPEN Raw Position Tick: {self.dxl_R_homing_openTick} tick")
             print(f"Gripper [DXL ID:{dxl_id}] CLOSE Raw Position Tick: {self.dxl_R_homing_closeTick} tick")
             print(f"Gripper [DXL ID:{dxl_id}] Tick Range: {self.dxl_R_homing_rangeTick} tick")
+            print("\n\n In robot_info.py file, Set the values:")
+            print(f"GRIPPER_OPEN_POS_RAWTICK_R  = {self.dxl_R_homing_openTick}")
+            print(f"GRIPPER_CLOSE_POS_RAWTICK_R = {self.dxl_R_homing_closeTick}")
+            print(f"GRIPPER_POS_RANGE_TICK_R    = {self.dxl_R_homing_rangeTick}")
         elif (dxl_id == RI.GRIPPER_ID_L):
             print(f"Gripper [DXL ID:{dxl_id}] OPEN Raw Position Tick: {self.dxl_L_homing_openTick} tick")
             print(f"Gripper [DXL ID:{dxl_id}] CLOSE Raw Position Tick: {self.dxl_L_homing_closeTick} tick")
             print(f"Gripper [DXL ID:{dxl_id}] Tick Range: {self.dxl_L_homing_rangeTick} tick")
+            print("\n\n In robot_info.py file, Set the values:")
+            print(f"GRIPPER_OPEN_POS_RAWTICK_L  = {self.dxl_L_homing_openTick}")
+            print(f"GRIPPER_CLOSE_POS_RAWTICK_L = {self.dxl_L_homing_closeTick}")
+            print(f"GRIPPER_POS_RANGE_TICK_L    = {self.dxl_L_homing_rangeTick}")
         
         UTIL.print_end_title(f"Gripper [DXL ID:{dxl_id}] Homing is Done")
         return True
     
     
     
-    def position_control_linear(self, dxl_id: int, linear_pos: float) -> bool:
+    def current_based_position_control_linear(self, dxl_id: int, current_ampere_mag: float=0.02, linear_pos: float=0.0) -> bool:
         """
             Move gripper using linear position.
-            MUST Use "Extended Position Control Mode(4)" of Grippers
-            Unit: [mm]
+            MUST Use "Current-based Position Control Mode(5)" of Grippers
+            Before use this function, operation mode should be "Current-based Position Control Mode(5)"
+            Unit: [A], [mm]
+            
+            current_ampere_mag:
+                Absolute value of Max Limit of current (default: 20mA)
+                It must not exceed 0.6725 A
             
             linear_pos:
                 0.0  -> closed
                 91.0 -> open
                 
             [Ex]
-                gripper.position_control_linear(ysw.GRIPPER_ID_R, 0.0)   # close
-                gripper.position_control_linear(ysw.GRIPPER_ID_R, 91.0)  # open
-                gripper.position_control_linear(ysw.GRIPPER_ID_R, GRIPPER_POS_RANGE_LINEAR)  # Open
+                gripper.current_based_position_control_linear(ysw.GRIPPER_ID_R, 0.02, 0.0)   # close
+                gripper.current_based_position_control_linear(ysw.GRIPPER_ID_R, 0.02, 91.0)  # open
+                gripper.current_based_position_control_linear(ysw.GRIPPER_ID_R, 0.02, GRIPPER_POS_RANGE_LINEAR)  # Open
         """
-        UTIL.print_start_title(f"Gripper [DXL ID:{dxl_id}] Position Control Starts")
+        UTIL.print_start_title(f"Gripper [DXL ID:{dxl_id}] Current-based Position Control Starts")
         print(f"Desired Linear Position = {linear_pos}mm")
         
         if (dxl_id is None) or (dxl_id not in [RI.GRIPPER_ID_R, RI.GRIPPER_ID_L]):
@@ -676,25 +716,38 @@ class Gripper:
             logging.error(f"[DXL ID:{dxl_id}] is NOT activated")
             return False
         
-        # Clamp 0.0(Closed) to maximum value(=91mm, Open)
+        mode = self.read_operation_mode(dxl_id)
+        if mode != RI.DXL_CURRENT_BASED_POSITION_CONTROL_MODE:
+            logging.error(f"[DXL ID:{dxl_id}] is NOT set as Current-based position control mode"
+                          f"Current operation mode = {mode}"
+            )
+            return False
+        
+        # 1. Clamp desired linear position: 0mm(Closed) to maximum value(=91mm, Open)
         if (linear_pos < 0):
             print("Position cannot be less than 0[mm]")
             print("Thus, Min value(CLOSED) is applied: 0[mm]")
         elif (linear_pos > RI.GRIPPER_POS_RANGE_LINEAR):
             print(f"Position cannot be larger than {RI.GRIPPER_POS_RANGE_LINEAR}[mm]")
             print(f"Thus, Max value(OPEN) is applied: {RI.GRIPPER_POS_RANGE_LINEAR}[mm]")
-        desired_pos_linear = max(0.0, min(linear_pos, RI.GRIPPER_POS_RANGE_LINEAR))
+        desired_pos_linear = max(0.0, min(linear_pos, RI.GRIPPER_POS_RANGE_LINEAR))     
         
+        # 2. Calculate the Raw Tick value for desired linear position
         if dxl_id == RI.GRIPPER_ID_R:
             desired_pos_tick = desired_pos_linear * RI.GRIPPER_POS_SCALE_LINEAR_TO_TICK_R
             offset_tick = RI.GRIPPER_CLOSE_POS_RAWTICK_R
         elif dxl_id == RI.GRIPPER_ID_L:
             desired_pos_tick = desired_pos_linear * RI.GRIPPER_POS_SCALE_LINEAR_TO_TICK_L
-            offset_tick = RI.GRIPPER_CLOSE_POS_RAWTICK_L
-            
+            offset_tick = RI.GRIPPER_CLOSE_POS_RAWTICK_L      
         desired_pos_tick = int(desired_pos_tick + offset_tick)
         
+        # 3. Set Goal Current (Should be less than 0.6725A)
+        current_A_abs = abs(current_ampere_mag)
+        current_A_abs = max(0.0, min(current_A_abs, RI.DXL_CURRENT_LIMIT_MAX_A_YSW)) 
+        self.write_current_ampere(dxl_id, current_A_abs)
+        
+        # 4. Set Goal Position
         if (self.write_goalPosition_tick(dxl_id=dxl_id, goalPos_tick=desired_pos_tick)):
-            UTIL.print_end_title(f"Gripper [DXL ID:{dxl_id}] Position Control Ends")
+            UTIL.print_end_title(f"Gripper [DXL ID:{dxl_id}] Current-based Position Control Ends")
             return True
         return False 
