@@ -58,6 +58,19 @@ MODEL_UB = "ub"
 
 
 # =============================================================================
+# Degree of Freedom (DoF)
+# =============================================================================
+
+DOF_HEAD        = 2
+DOF_MOBILE      = 2
+DOF_TORSO       = 6
+DOF_RIGHT_ARM   = 7
+DOF_LEFT_ARM    = 7
+DOF_BODY        = 20    # Torso + Arms
+DOF_TOTAL       = 24
+
+
+# =============================================================================
 # Robot Initialize Option (default_lib -> "initialize" function)
 # =============================================================================
 
@@ -100,6 +113,80 @@ LED_WHITE  = (255, 255, 255)
 
 
 # =============================================================================
+# Link Name
+# =============================================================================
+
+ALL_LINK_NAMES = ["base",
+                  "wheel_r",
+                  "wheel_l",
+                  "link_torso_0",
+                  "link_torso_1",
+                  "link_torso_2",
+                  "link_torso_3",
+                  "link_torso_4",
+                  "link_torso_5",
+                  "link_right_arm_0",
+                  "link_right_arm_1",
+                  "link_right_arm_2",
+                  "link_right_arm_3",
+                  "link_right_arm_4",
+                  "link_right_arm_5",
+                  "link_right_arm_6",
+                  "link_left_arm_0",
+                  "link_left_arm_1",
+                  "link_left_arm_2",
+                  "link_left_arm_3",
+                  "link_left_arm_4",
+                  "link_left_arm_5",
+                  "link_left_arm_6",
+                  "ee_right",
+                  "ee_finger_r1",
+                  "ee_finger_r2",
+                  "ee_left",
+                  "ee_finger_l1",
+                  "ee_finger_l2",
+                  "link_head_0",
+                  "link_head_1",
+                  "link_head_2"]
+
+TOTAL_LINK_NUMBER = 32
+
+
+
+# =============================================================================
+# Joint Name
+# =============================================================================
+
+ALL_JOINT_NAMES = ["right_wheel",
+                   "left_wheel",
+                   "torso_0",
+                   "torso_1",
+                   "torso_2",
+                   "torso_3",
+                   "torso_4",
+                   "torso_5",
+                   "right_arm_0",
+                   "right_arm_1",
+                   "right_arm_2",
+                   "right_arm_3",
+                   "right_arm_4",
+                   "right_arm_5",
+                   "right_arm_6",
+                   "left_arm_0",
+                   "left_arm_1",
+                   "left_arm_2",
+                   "left_arm_3",
+                   "left_arm_4",
+                   "left_arm_5",
+                   "left_arm_6",
+                   "head_0",
+                   "head_1",]
+
+TOTAL_JOINT_NUMBER = 24
+
+
+
+# =============================================================================
 # 22-DoF Joint Position for (Head + Body) Postures
 # =============================================================================
 
@@ -128,12 +215,29 @@ GRIPPER_DEBUG_POS = {"torso":     np.deg2rad([0.0, 80.0, -140.0,   60.0, 0.0,   
                      "left_arm":  np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0, -20.0, 0.0]),
                      "head":      np.deg2rad([0.0, 0.0])}
 
+
+
 # =============================================================================
 # 2-DoF Joint Position for (Head) Postures [0: Yaw, 1: Pitch]
 # =============================================================================
 
-HEAD_POS_DEMO = [0.0, np.deg2rad(30.0)] 
+HEAD_DEMO_POS = [0.0, np.deg2rad(30.0)] 
 HEAD_ZERO_POS = [0.0, 0.0]
+
+
+
+
+# =============================================================================
+# Parameters for Cartesian Command
+# =============================================================================
+
+LINEAR_VELOCITY_LIMIT       = 1.5
+ANGULAR_VELOCITY_LIMIT      = 1.5
+ACCELERATION_LIMIT          = 1.0
+
+MINIMUM_TIME                        = 4
+STOP_ORIENTATION_TRACKING_ERROR     = 0.0001
+STOP_POSITION_TRACKING_ERROR        = 0.001
 
 
 

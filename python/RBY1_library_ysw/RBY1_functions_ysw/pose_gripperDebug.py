@@ -29,5 +29,5 @@ robotConfig = ysw.setRobotConfig(ysw.MODE_DIRECT_UPC, ysw.MODEL_A)
 robot = ysw.initialize(robotConfig.mode, robotConfig.address, robotConfig.model, option=ysw.CONNECT_ONLY)
 
 print("[Posture: Gripper Debug] Starts")
-ysw.move_position_22dof(robot, ysw.GRIPPER_DEBUG_POS, minimum_time=5.0, control_hold_time=0.5, get_return=True)
+ysw.positionCtrl_joint_22dof(robot, ysw.GRIPPER_DEBUG_POS, minimum_time=5.0, control_hold_time=0.5, get_return=True)
 print("[Posture: Gripper Debug] Ends")
