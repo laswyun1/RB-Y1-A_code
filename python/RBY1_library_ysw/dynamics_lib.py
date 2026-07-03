@@ -24,8 +24,9 @@ from typing import Sequence
 # =============================================================================
 # Kinematics Functions
 # =============================================================================
-def rpy_to_rotmat(rpy: Sequence[float]=(0.0, 0.0, 0.0)) -> np.ndarray:
-    """Build a 3x3 Rotation Matrix from RPY values
+def rpy_to_rotMat(rpy: Sequence[float]=(0.0, 0.0, 0.0)) -> np.ndarray:
+    """
+    Build a 3x3 Rotation Matrix from RPY values
        RPY = ZYX Euler Angle
        
        [Rotation Sequence]
@@ -58,6 +59,38 @@ def rpy_to_rotmat(rpy: Sequence[float]=(0.0, 0.0, 0.0)) -> np.ndarray:
         [     0,           0,       1]
     ])
     return Rz @ Ry @ Rx  
+
+
+
+def rotMat_to_rpy(rotMat: np.ndarray) -> np.ndarray:
+    """
+    Build 3x1 RPY from 3x3 Rotation Matrix
+        RPY = ZYX Euler Angle
+
+        [Rotation Sequence]
+        RPY             : [Reference: Fixed coordinate]   X -> Y -> Z
+        ZYX Eulear Angle: [Reference: Rotated coordinate] Z -> Y -> X  
+    
+    Args:
+        rotMat: 3x3 Rotation Matrix 
+    
+    Returns: 
+        3x1 RPY value: [roll, pitch, yaw], unit=[rad]
+    """
+    R = np.asarray(rotMat, dtype=float)
+
+    sy = np.sqrt(R[0, 0] ** 2 + R[1, 0] ** 2)
+
+    if sy > 1e-6:
+        roll = np.arctan2(R[2, 1], R[2, 2])         # arctan2(y,x) = tan^-1(y/x), range: -180deg ~ +180deg
+        pitch = np.arctan2(-R[2, 0], sy)
+        yaw = np.arctan2(R[1, 0], R[0, 0])
+    else:
+        # Gimbal lock case
+        roll = np.arctan2(-R[1, 2], R[1, 1])
+        pitch = np.arctan2(-R[2, 0], sy)
+        yaw = 0.0
+    return np.array([roll, pitch, yaw])
 
 
 
@@ -128,6 +161,113 @@ def make_HT(rotMat: np.ndarray, translation: list[float]) -> np.ndarray:
     T[:3, :3] = rotMat
     T[:3, 3] = np.asarray(translation, dtype=float)
     return T
+
+
+
+def get_FK(
+    robot,
+    reference_link: str,
+    target_link: str
+):
+    """
+    Get current pose of target_link with respect to reference_link.
+
+    Args:
+        robot:
+            rby1_sdk robot object
+
+        reference_link:
+            ex) "base", "link_torso_5", "ee_right"
+
+        target_link:
+            ex) "ee_right", "ee_left", "link_torso_5"
+
+    Returns:
+        result:
+            {
+                "T": 4x4 homogeneous transformation matrix,
+                "pos": np.array([x, y, z]),
+                "rotMat": 3x3 rotation matrix,
+                "rpy": np.array([roll, pitch, yaw])
+            }
+
+        Failed:
+            None
+    """
+    UTIL.print_start_title(f"FK of '{target_link}' from '{reference_link}' Starts")
+
+    # 1. Get robot model and dynamics model
+    model = robot.model()
+    dyn_robot = robot.get_dynamics()
+
+    # 2. Check validity of link names
+    if reference_link not in RI.ALL_LINK_NAMES:
+        logging.error(f"reference link name {reference_link} is incorrect")
+        return None
+    if target_link not in RI.ALL_LINK_NAMES:
+        logging.error(f"target link name {target_link} is incorrect")
+        return None
+
+    # 3. Make dynamics state (link list order is important)
+    # 0-th: reference_link
+    # 1-th: target_link
+    dyn_state = dyn_robot.make_state([reference_link, target_link], model.robot_joint_names)
+
+    # 4. Get current robot state
+    robot_state = robot.get_state()
+    q = np.asarray(robot_state.position, dtype=float)   # "robot_state.position" = current joint position(q)
+
+    # Check full joint position values are acquired(24-DoF)
+    if q.shape[0] != RI.DOF_TOTAL:
+        logging.error(f"robot_state.position is not {RI.DOF_TOTAL}-DoF")
+        return None
+
+    # 5. Set q
+    dyn_state.set_q(q)
+
+    # vel and acc are not required for FK.
+    # But, to maintain "dynamics state" format, set 0 all.
+    dyn_state.set_qdot(np.zeros(RI.DOF_TOTAL))
+    dyn_state.set_qddot(np.zeros(RI.DOF_TOTAL))
+
+    # 6. Forward Kinematics
+    dyn_robot.compute_forward_kinematics(dyn_state)
+
+    # 7. Compute transformation
+    # From (3) "make_state", the order is [reference_link, target_link], thus
+    # 0: reference_link
+    # 1: target_link
+    try:
+        T_ref_target = dyn_robot.compute_transformation(dyn_state, 0, 1)
+    except Exception as e:
+        logging.error(f"Failed to compute transformation: {e}")
+        return None
+
+    T_ref_target = np.asarray(T_ref_target, dtype=float)
+
+    # 8. Extract position and orientation
+    pos = T_ref_target[:3, 3]
+    rotMat = T_ref_target[:3, :3]
+    rpy = rotMat_to_rpy(rotMat)
+
+    result = {
+        "T": T_ref_target,
+        "position": pos,
+        "rotation": rotMat,
+        "rpy": rpy
+    }
+
+    print("[Result]\n")
+    print("T:")
+    print(T_ref_target)
+    print("\n")
+    print(f"position [m]: {pos}")
+    print(f"rpy [rad]: {rpy}")
+    print(f"rpy [deg]: {rpy * RI.RAD2DEG}")
+
+    UTIL.print_end_title(f"FK of '{target_link}' from '{reference_link}' Ends")
+    return result
+
 
 
 
@@ -337,8 +477,9 @@ def positionCtrl_cartesian_fixed(
 
     Move target links with respect to reference links.
     Fix other components
-    For example, if "component" is "right_arm", 
-    then just 7-DoF "right_arm" joints move while fixing other joints  
+
+    For example, if "moving_component" is "right_arm",
+    then just 7-DoF "right_arm" joints move while fixing other joints.
     
     Caution!!:
         "target_link" should be matched with "component"  
@@ -347,18 +488,18 @@ def positionCtrl_cartesian_fixed(
         cartesian_targets:
             [
                 {
-                    "moving_component": "right_arm",   # "torso", "right_arm", "left_arm" 
+                    "moving_component": "right_arm",            # "torso", "right_arm", "left_arm" 
                     "reference_link": "base",
                     "target_link": "ee_right",
-                    "rpy": [roll, pitch, yaw],
                     "pos": [x, y, z],
+                    "rpy": [roll, pitch, yaw],
                 },
                 {
                     "moving_component": "left_arm",
                     "reference_link": "base",
                     "target_link": "ee_left",
-                    "rpy": [roll, pitch, yaw],
                     "pos": [x, y, z],
+                    "rpy": [roll, pitch, yaw],
                 },
             ]
 
@@ -390,17 +531,17 @@ def positionCtrl_cartesian_fixed(
 
     # 4. Add Cartesian targets
     for i, cartesian_target in enumerate(cartesian_targets):
-        component = cartesian_target.get("component")
+        moving_component = cartesian_target.get("moving_component")
         reference_link = cartesian_target.get("reference_link")
         target_link = cartesian_target.get("target_link")
-        rpy = cartesian_target.get("rpy")
         pos = cartesian_target.get("pos")
+        rpy = cartesian_target.get("rpy")
 
-        if component is None:
+        if moving_component is None:
             logging.error(f"cartesian_target {i} has no component")
             return False
 
-        if component not in ["torso", "right_arm", "left_arm"]:
+        if moving_component not in ["torso", "right_arm", "left_arm"]:
             logging.error(
                 f"cartesian_target {i}['component'] must be "
                 "'torso', 'right_arm', or 'left_arm'"
@@ -424,10 +565,10 @@ def positionCtrl_cartesian_fixed(
             return False
 
         # 5. Make Homogeneous Transform Matrix
-        T = make_HT(rpy_to_rotmat(rpy), pos)
+        T = make_HT(rpy_to_rotMat(rpy), pos)
 
-        # 6. Select component builder
-        if component == "torso":
+        # 6. Select moving_component builder
+        if moving_component == "torso":
             if torso_cmd_builder is None:
                 torso_cmd_builder = rby.CartesianCommandBuilder()
 
@@ -441,7 +582,7 @@ def positionCtrl_cartesian_fixed(
             )
             has_torso_command = True
 
-        elif component == "right_arm":
+        elif moving_component == "right_arm":
             if right_arm_cmd_builder is None:
                 right_arm_cmd_builder = rby.CartesianCommandBuilder()
 
@@ -455,7 +596,7 @@ def positionCtrl_cartesian_fixed(
             )
             has_right_arm_command = True
 
-        elif component == "left_arm":
+        elif moving_component == "left_arm":
             if left_arm_cmd_builder is None:
                 left_arm_cmd_builder = rby.CartesianCommandBuilder()
 
@@ -471,8 +612,8 @@ def positionCtrl_cartesian_fixed(
 
         logging.info(
             f"Add (Fixed) Cartesian target {i}: "
-            f"component={component}, {reference_link} -> {target_link}, "
-            f"rpy={rpy}, pos={pos}"
+            f"component='{moving_component}', '{reference_link}'->'{target_link}', "
+            f"pos={pos}, rpy={rpy}"         # Relative position and orientation
         )
 
     # 7. Add joint position targets if needed
@@ -510,10 +651,10 @@ def positionCtrl_cartesian_fixed(
                 has_left_arm_command = True
 
             else:
-                logging.error(f"Unknown joint name: {joint_name}")
+                logging.error(f"Unknown joint name: '{joint_name}'")
                 return False
 
-            logging.info(f"Add joint position target: {joint_name} = {joint_pos}")
+            logging.info(f"Add joint position target: '{joint_name}' = {joint_pos}")
 
 
     # 8. Set options for each component command
@@ -647,7 +788,7 @@ def positionCtrl_cartesian_NotFixed(
             return False
         
         # 3. Make Homogeneous Transform Matrix
-        T = make_HT(rpy_to_rotmat(rpy), pos)
+        T = make_HT(rpy_to_rotMat(rpy), pos)
         
         # 4. Add Cartesian target
         cartesian_cmd_builder.add_target(

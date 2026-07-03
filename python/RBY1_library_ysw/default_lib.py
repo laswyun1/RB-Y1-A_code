@@ -99,6 +99,11 @@ def initialize(mode: str, address: str, model: str, power: str=".*", servo: str=
             if not robot.reset_fault_control_manager():             # CM Reset
                 logging.error("Failed to Reset the Control Manager")
                 return None
+            # After the fault, enable/disable CM is not working without "unlimited_mode_enabled=True"
+            if not robot.enable_control_manager(unlimited_mode_enabled=True):       # Essential for Reinitialize from Fault
+                logging.error("Failed to Unlimit the Control Manager after Fault")
+                return None
+
         logging.info("SUCCESS: Reset the Control Manager!")
     
         # 6.Enable Control Manager
