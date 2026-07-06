@@ -459,9 +459,9 @@ def positionCtrl_joint_head(robot, q_head, minimum_time=2.0, control_hold_time=0
 
 
 
-def positionCtrl_cartesian_fixed(
+def positionCtrl_cartesian_componentWise(
     robot, 
-    cartesian_targets: list[dict], 
+    position_targets: list[dict], 
     joint_targets: dict | None = None, 
     minimum_time: float = RI.MINIMUM_TIME,
     linear_velocity_limit: float = RI.LINEAR_VELOCITY_LIMIT,
@@ -473,19 +473,21 @@ def positionCtrl_cartesian_fixed(
     get_return: bool = True
 ):
     """
-    Cartesian Position Control (Fixed version)
+    Cartesian Position Control (Component-wise version)
 
     Move target links with respect to reference links.
-    Fix other components
+    Fix other components (torso[6-DoF] / right arm[7-DoF] / left arm[7-DoF])
 
     For example, if "moving_component" is "right_arm",
     then just 7-DoF "right_arm" joints move while fixing other joints.
+
+    "joint_targets" are additional constraints to keep
     
     Caution!!:
-        "target_link" should be matched with "component"  
+        "target_link" should be matched with "moving_component"  
 
     Args:
-        cartesian_targets:
+        position_targets:
             [
                 {
                     "moving_component": "right_arm",            # "torso", "right_arm", "left_arm" 
@@ -510,11 +512,11 @@ def positionCtrl_cartesian_fixed(
             }
     """
 
-    UTIL.print_start_title("Cartesian Position Control(Fixed) Starts")
+    UTIL.print_start_title("Cartesian Position Control(Component-wise) Starts")
     
     # 1. Argument validity check
-    if cartesian_targets is None or len(cartesian_targets) == 0:
-        logging.error("No Cartesian target is given")
+    if position_targets is None or len(position_targets) == 0:
+        logging.error("No Cartesian Position target is given")
         return False
 
     # 2. Make Body Component Command Builder
@@ -530,38 +532,38 @@ def positionCtrl_cartesian_fixed(
     has_left_arm_command = False
 
     # 4. Add Cartesian targets
-    for i, cartesian_target in enumerate(cartesian_targets):
-        moving_component = cartesian_target.get("moving_component")
-        reference_link = cartesian_target.get("reference_link")
-        target_link = cartesian_target.get("target_link")
-        pos = cartesian_target.get("pos")
-        rpy = cartesian_target.get("rpy")
+    for i, position_target in enumerate(position_targets):
+        moving_component = position_target.get("moving_component")
+        reference_link = position_target.get("reference_link")
+        target_link = position_target.get("target_link")
+        pos = position_target.get("pos")
+        rpy = position_target.get("rpy")
 
         if moving_component is None:
-            logging.error(f"cartesian_target {i} has no component")
+            logging.error(f"position_target {i} has no 'moving_component'")
             return False
 
         if moving_component not in ["torso", "right_arm", "left_arm"]:
             logging.error(
-                f"cartesian_target {i}['component'] must be "
+                f"position_target {i}['component'] must be "
                 "'torso', 'right_arm', or 'left_arm'"
             )
             return False
 
         if reference_link is None:
-            logging.error(f"cartesian_target {i} has no reference_link")
+            logging.error(f"position_target {i} has no 'reference_link'")
             return False
 
         if target_link is None:
-            logging.error(f"cartesian_target {i} has no target_link")
+            logging.error(f"position_target {i} has no 'target_link'")
             return False
-
-        if rpy is None or len(rpy) != 3:
-            logging.error(f"cartesian_target {i}['rpy'] must have 3 elements")
-            return False
-
+        
         if pos is None or len(pos) != 3:
-            logging.error(f"cartesian_target {i}['pos'] must have 3 elements")
+            logging.error(f"position_target {i}['pos'] must have 3 elements")
+            return False
+        
+        if rpy is None or len(rpy) != 3:
+            logging.error(f"position_target {i}['rpy'] must have 3 elements")
             return False
 
         # 5. Make Homogeneous Transform Matrix
@@ -611,7 +613,7 @@ def positionCtrl_cartesian_fixed(
             has_left_arm_command = True
 
         logging.info(
-            f"Add (Fixed) Cartesian target {i}: "
+            f"Add (Component-wise) Position target {i}: "
             f"component='{moving_component}', '{reference_link}'->'{target_link}', "
             f"pos={pos}, rpy={rpy}"         # Relative position and orientation
         )
@@ -698,24 +700,24 @@ def positionCtrl_cartesian_fixed(
 
         if rv.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
             logging.error(
-                f"Failed to conduct Cartesian Position Control. "
+                f"Failed to conduct Cartesian Position Control(Component-wise). "
                 f"finish_code = {rv.finish_code}"
             )
             return False
 
-        UTIL.print_end_title("Cartesian Position Control(Fixed) Ends")
+        UTIL.print_end_title("Cartesian Position Control(Component-wise) Ends")
         return True
 
     else:
         rv = robot.send_command(rc)
-        UTIL.print_end_title("Cartesian Position Control(Fixed) Ends")
+        UTIL.print_end_title("Cartesian Position Control(Component-wise) Ends")
         return rv
     
 
 
-def positionCtrl_cartesian_NotFixed(
+def positionCtrl_cartesian_wholeBody(
     robot, 
-    cartesian_targets: list[dict], 
+    position_targets: list[dict], 
     joint_targets: dict | None=None, 
     minimum_time: float = RI.MINIMUM_TIME,
     linear_velocity_limit: float = RI.LINEAR_VELOCITY_LIMIT,
@@ -727,70 +729,76 @@ def positionCtrl_cartesian_NotFixed(
     get_return=True
 ):
     """
-    Cartesian(Relative) Position Control
-    Move "target link" coordinate with respect to "reference link" coordinate
-    
+    Cartesian Position Control (Whole-Body version)
+
+    Move target links with respect to reference links.
+    Do not Fix other components (Using Whole-Body joints)
+
+    For example, if reference link is "base" and target link is "ee_left",
+    The robot can move ALL parts(Not only use "left_arm" 7-DoF) to achieve the target
+
+    "joint_targets" are additional constraints to keep
+
     Args:
-        cartesian_targets:  list of "reference link, target link, relative RPY, relative Position" 
+        position_targets:
             [
                 {
                     "reference_link": "base",
                     "target_link": "ee_right",
-                    "rpy": [roll, pitch, yaw],
                     "pos": [x, y, z],
+                    "rpy": [roll, pitch, yaw],
                 },
                 {
                     "reference_link": "base",
                     "target_link": "ee_left",
-                    "rpy": [roll, pitch, yaw],
                     "pos": [x, y, z],
-                }, ...
+                    "rpy": [roll, pitch, yaw],
+                },
             ]
-        
-        joint_targets:  Additional constraints for certain joint to reduce redundancy
+
+        joint_targets:
             {
                 "right_arm_1": -np.pi / 3,
                 "left_arm_1": np.pi / 3,
             }
-            
-        Order of these 2 arguments should be matched !!
     """
-    UTIL.print_start_title("Cartesian Position Control Starts")
+    UTIL.print_start_title("Cartesian Position Control(Whole-Body) Starts")
     
-    # 1. Argument Validity Check
-    if cartesian_targets is None or len(cartesian_targets) == 0:
-        logging.error("No Cartesian target is given")
+    # 1. Argument validity check
+    if position_targets is None or len(position_targets) == 0:
+        logging.error("No Position target is given")
         return False
-    
+
     # 2. Make Cartesian Command Builder
     cartesian_cmd_builder = rby.CartesianCommandBuilder()
-    
-    for i, cartesian_target in enumerate(cartesian_targets):
-        reference_link = cartesian_target.get("reference_link")
-        target_link    = cartesian_target.get("target_link")
-        rpy            = cartesian_target.get("rpy")
-        pos            = cartesian_target.get("pos")
+
+    # 3. Add Cartesian targets
+    for i, position_target in enumerate(position_targets):
+        reference_link = position_target.get("reference_link")
+        target_link = position_target.get("target_link")
+        pos = position_target.get("pos")
+        rpy = position_target.get("rpy")
 
         if reference_link is None:
-            logging.error(f"cartesian target[{i}] has no reference_link")
+            logging.error(f"position_target {i} has no 'reference_link'")
             return False
 
         if target_link is None:
-            logging.error(f"cartesian target[{i}] has no target_link")
+            logging.error(f"position_target {i} has no 'target_link'")
+            return False
+        
+        if pos is None or len(pos) != 3:
+            logging.error(f"position_target {i}['pos'] must have 3 elements")
             return False
 
         if rpy is None or len(rpy) != 3:
-            logging.error(f"cartesian target[{i}]['rpy'] must have 3 elements")
+            logging.error(f"position_target {i}['rpy'] must have 3 elements")
             return False
 
-        if pos is None or len(pos) != 3:
-            logging.error(f"cartesian target[{i}]['pos'] must have 3 elements")
-            return False
-        
-        # 3. Make Homogeneous Transform Matrix
+        # 4. Make Homogeneous Transform Matrix
         T = make_HT(rpy_to_rotMat(rpy), pos)
-        
-        # 4. Add Cartesian target
+
+        # 5. Add Cartesian target
         cartesian_cmd_builder.add_target(
             reference_link,
             target_link,
@@ -801,17 +809,18 @@ def positionCtrl_cartesian_NotFixed(
         )
 
         logging.info(
-            f"Add Cartesian target [{i}]: "
-            f"{reference_link} -> {target_link}, rpy={rpy}, pos={pos}"
+            f"Add (Whole-Body) Cartesian target {i}: "
+            f"'{reference_link}'->'{target_link}', "
+            f"pos={pos}, rpy={rpy}"         # Relative position and orientation
         )
-        
-    # 5. Add joint position targets if needed
+
+    # 6. Add joint position targets if needed
     if joint_targets is not None:
         for joint_name, joint_pos in joint_targets.items():
             cartesian_cmd_builder.add_joint_position_target(joint_name, float(joint_pos))
             logging.info(f"Add joint position target: {joint_name} = {joint_pos}")
-                
-    # 6. Set common options
+
+    # 7. Set options 
     cartesian_cmd_builder.set_minimum_time(minimum_time)
     cartesian_cmd_builder.set_stop_position_tracking_error(stop_position_tracking_error)
     cartesian_cmd_builder.set_stop_orientation_tracking_error(stop_orientation_tracking_error)
@@ -821,29 +830,884 @@ def positionCtrl_cartesian_NotFixed(
             rby.CommandHeaderBuilder().set_control_hold_time(control_hold_time)
         )
 
-    # 7. Build robot command
+    # 8. Build robot command
     rc = rby.RobotCommandBuilder().set_command(
         rby.ComponentBasedCommandBuilder().set_body_command(
             cartesian_cmd_builder
         )
     )
 
-    # 8. Send command
+    # 9. Send command
     if get_return:
         rv = robot.send_command(rc).get()
 
         if rv.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
-            logging.error("Failed to conduct Cartesian Position Control")
+            logging.error(
+                f"Failed to conduct Cartesian Position Control(Whole-Body). "
+                f"finish_code = {rv.finish_code}"
+            )
             return False
 
-        UTIL.print_end_title("Cartesian Position Control Ends")
+        UTIL.print_end_title("Cartesian Position Control(Whole-Body) Ends")
         return True
+
     else:
         rv = robot.send_command(rc)
-        UTIL.print_end_title("Cartesian Position Control Ends")
+        UTIL.print_end_title("Cartesian Position Control(Whole-Body) Ends")
         return rv
 
 
 
+def impedanceCtrl_cartesian_componentWise(
+    robot, 
+    impedance_targets: list[dict], 
+    default_translation_weight: list[float] = RI.DEFAULT_TRANSLATION_WEIGHT,
+    default_rotation_weight: list[float] = RI.DEFAULT_ROTATION_WEIGHT,
+    default_damping_ratio: float = RI.DEFAULT_DAMPING_RATIO,
+    control_hold_time: float = RI.DEFAULT_CONTROL_HOLD_TIME,     # Important!! 
+    get_return=True
+):
+    """
+    Cartesian Impedance Control (Component-wise version)
+
+    Move target links with respect to reference links using [impedance control].
+    Fix other components (torso[6-DoF] / right_arm[7-DoF] / left_arm[7-DoF]).
+
+    For example, if "moving_component" is "right_arm",
+    then only 7-DoF right_arm joints move while other body components are fixed.
+
+    Args:
+        impedance_targets:
+            [
+                {
+                    "moving_component": "torso",                # "torso", "right_arm", "left_arm"
+                    "reference_link": "base",
+                    "target_link": "link_torso_5",
+                    "pos": [x, y, z],
+                    "rpy": [roll, pitch, yaw],
+
+                    # optional
+                    "translation_weight": [1000, 1000, 1000],
+                    "rotation_weight": [100, 100, 100],
+                    "damping_ratio": 0.85,
+                    "control_hold_time": 3.0,
+                },
+                {
+                    "moving_component": "right_arm",
+                    "reference_link": "link_torso_5",
+                    "target_link": "ee_right",
+                    "pos": [x, y, z],
+                    "rpy": [roll, pitch, yaw],
+
+                    # optional
+                    "translation_weight": [1000, 1000, 1000],
+                    "rotation_weight": [50, 50, 50],
+                    "damping_ratio": 0.85,
+                },
+            ]
+
+        translation_weight:
+            Higher value means larger stiffness
+
+        rotation_weight:
+            Higher value means larger stiffness
+
+        damping_ratio:
+            Higher value means larger damping
 
     
+    [CMD structure]
+        RobotCommandBuilder
+        └── ComponentBasedCommandBuilder
+            └── BodyComponentBasedCommandBuilder
+                ├── torso_command
+                ├── right_arm_command
+                └── left_arm_command
+    """
+    UTIL.print_start_title("Cartesian Impedance Control(Component-wise) Starts")
+    
+    # 1. Argument validity check
+    if impedance_targets is None or len(impedance_targets) == 0:
+        logging.error("No impedance target is given")
+        return False
+
+    # 2. Make Body Component Command Builder
+    body_cmd_builder = rby.BodyComponentBasedCommandBuilder()
+
+    torso_cmd_builder = None
+    right_arm_cmd_builder = None
+    left_arm_cmd_builder = None
+
+    has_torso_command = False
+    has_right_arm_command = False
+    has_left_arm_command = False
+
+    # 3. Add impedance targets
+    for i, impedance_target in enumerate(impedance_targets):
+        moving_component = impedance_target.get("moving_component")
+        reference_link = impedance_target.get("reference_link")
+        target_link = impedance_target.get("target_link")
+        pos = impedance_target.get("pos")
+        rpy = impedance_target.get("rpy")
+
+        translation_weight = impedance_target.get(
+            "translation_weight",
+            default_translation_weight
+        )
+        rotation_weight = impedance_target.get(
+            "rotation_weight",
+            default_rotation_weight
+        )
+        damping_ratio = impedance_target.get(
+            "damping_ratio",
+            default_damping_ratio
+        )
+        target_control_hold_time = impedance_target.get(
+            "control_hold_time",
+            control_hold_time
+        )
+
+        if moving_component is None:
+            logging.error(f"impedance_target {i} has no 'moving_component'")
+            return False
+
+        if moving_component not in ["torso", "right_arm", "left_arm"]:
+            logging.error(
+                f"impedance_target {i}['moving_component'] must be "
+                "'torso', 'right_arm', or 'left_arm'"
+            )
+            return False
+
+        if reference_link is None:
+            logging.error(f"impedance_target {i} has no 'reference_link'")
+            return False
+
+        if target_link is None:
+            logging.error(f"impedance_target {i} has no 'target_link'")
+            return False
+
+        if pos is None or len(pos) != 3:
+            logging.error(f"impedance_target {i}['pos'] must have 3 elements")
+            return False
+
+        if rpy is None or len(rpy) != 3:
+            logging.error(f"impedance_target {i}['rpy'] must have 3 elements")
+            return False
+
+        if translation_weight is None or len(translation_weight) != 3:
+            logging.error(
+                f"impedance_target {i}['translation_weight'] must have 3 elements"
+            )
+            return False
+
+        if rotation_weight is None or len(rotation_weight) != 3:
+            logging.error(
+                f"impedance_target {i}['rotation_weight'] must have 3 elements"
+            )
+            return False
+
+        # 4. Make Homogeneous Transform Matrix
+        T = make_HT(rpy_to_rotMat(rpy), pos)
+
+        # 5. Make Impedance Control Command Builder
+        impedance_cmd_builder = (
+            rby.ImpedanceControlCommandBuilder()
+            .set_reference_link_name(reference_link)
+            .set_link_name(target_link)
+            .set_translation_weight(translation_weight)
+            .set_rotation_weight(rotation_weight)
+            .set_transformation(T)
+        )
+
+        # 6. Set options (ImpedanceControlCommandBuilder' object has no attribute 'set_minimum_time')
+        if control_hold_time is not None: # [Important] If 'control_hold_time' is 0 or None, the robot is not moving
+            impedance_cmd_builder.set_command_header(
+                rby.CommandHeaderBuilder().set_control_hold_time(target_control_hold_time)
+            )
+
+        if damping_ratio is not None:
+            impedance_cmd_builder.set_damping_ratio(float(damping_ratio))
+
+        # 7. Select moving_component command
+        if moving_component == "torso":
+            torso_cmd_builder = impedance_cmd_builder
+            has_torso_command = True
+
+        elif moving_component == "right_arm":
+            right_arm_cmd_builder = impedance_cmd_builder
+            has_right_arm_command = True
+
+        elif moving_component == "left_arm":
+            left_arm_cmd_builder = impedance_cmd_builder
+            has_left_arm_command = True
+
+        logging.info(
+            f"Add (Component-wise) Impedance target {i}: "
+            f"moving_component='{moving_component}', "
+            f"'{reference_link}'->'{target_link}', "
+            f"pos={pos}, rpy={rpy}, "
+            f"translation_weight={translation_weight}, "
+            f"rotation_weight={rotation_weight}, "
+            f"damping_ratio={damping_ratio}, "
+            f"control_hold_time={target_control_hold_time}"
+        )
+
+    # 8. Apply component commands
+    if has_torso_command:
+        body_cmd_builder.set_torso_command(torso_cmd_builder)
+
+    if has_right_arm_command:
+        body_cmd_builder.set_right_arm_command(right_arm_cmd_builder)
+
+    if has_left_arm_command:
+        body_cmd_builder.set_left_arm_command(left_arm_cmd_builder)
+
+    if not has_torso_command and not has_right_arm_command and not has_left_arm_command:
+        logging.error("No impedance command is applied")
+        return False
+
+    # 9. Build robot command
+    rc = rby.RobotCommandBuilder().set_command(
+        rby.ComponentBasedCommandBuilder().set_body_command(
+            body_cmd_builder
+        )
+    )
+
+    # 10. Send command
+    if get_return:
+        rv = robot.send_command(rc).get()
+
+        if rv.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
+            logging.error(
+                f"Failed to conduct Cartesian Impedance Control(Component-wise). "
+                f"finish_code = {rv.finish_code}"
+            )
+            return False
+
+        UTIL.print_end_title("Cartesian Impedance Control(Component-wise) Ends")
+        return True
+
+    else:
+        rv = robot.send_command(rc)
+        UTIL.print_end_title("Cartesian Impedance Control(Component-wise) Ends")
+        return rv
+    
+
+
+def mixedCtrl_PositionAndImpedance_cartesian_componentWise(
+    robot,
+    position_targets: list[dict] | None = None,
+    impedance_targets: list[dict] | None = None,
+    minimum_time_PC: float = RI.MINIMUM_TIME,
+    linear_velocity_limit_PC: float = RI.LINEAR_VELOCITY_LIMIT,
+    angular_velocity_limit_PC: float = RI.ANGULAR_VELOCITY_LIMIT,
+    acceleration_limit_PC: float = RI.ACCELERATION_LIMIT,
+    stop_position_tracking_error_PC: float = RI.STOP_POSITION_TRACKING_ERROR,
+    stop_orientation_tracking_error_PC: float = RI.STOP_ORIENTATION_TRACKING_ERROR,
+    default_translation_weight_IC: list[float] = RI.DEFAULT_TRANSLATION_WEIGHT,
+    default_rotation_weight_IC: list[float] = RI.DEFAULT_ROTATION_WEIGHT,
+    default_damping_ratio_IC: float = RI.DEFAULT_DAMPING_RATIO,
+    control_hold_time_PC: float | None = None,           
+    control_hold_time_IC: float = RI.DEFAULT_CONTROL_HOLD_TIME,     # Important!! 
+    get_return: bool = True,
+):
+    """
+    [Position + Impedance] Control (Component-wise version)
+
+    This function can mix:
+        - target1: Cartesian position control
+        - target2: Cartesian impedance control
+
+    Example:
+        right_arm:
+            Position control
+            Move ee_right with respect to base.
+
+        left_arm:
+            Impedance control
+            Keep ee_left relative to ee_right.
+
+    Args:
+        position_targets:
+            [
+                {
+                    "moving_component": "right_arm",        # "torso", "right_arm", "left_arm"
+                    "reference_link": "base",
+                    "target_link": "ee_right",
+                    "pos": [x, y, z],
+                    "rpy": [roll, pitch, yaw],
+
+                    # optional
+                    "minimum_time": 3.0,
+                    "control_hold_time": 0.5,
+                    "joint_targets": {
+                        "right_arm_1": -np.pi / 3,
+                    },
+                },
+            ]
+
+        impedance_targets:
+            [
+                {
+                    "moving_component": "left_arm",         # "torso", "right_arm", "left_arm"
+                    "reference_link": "ee_right",   
+                    "target_link": "ee_left",
+                    "pos": [x, y, z],
+                    "rpy": [roll, pitch, yaw],
+
+                    # optional
+                    "translation_weight": [1000, 1000, 1000],
+                    "rotation_weight": [50, 50, 50],
+                    "damping_ratio": 0.85,
+                    "control_hold_time": 3.0,
+                },
+            ]
+
+    [CMD structure]
+        RobotCommandBuilder
+        └── ComponentBasedCommandBuilder
+            └── BodyComponentBasedCommandBuilder
+                ├── torso_command
+                ├── right_arm_command
+                └── left_arm_command
+    """
+
+    UTIL.print_start_title("Cartesian (Position + Impedance) Control Starts")
+
+    if (position_targets is None or len(position_targets) == 0) and \
+       (impedance_targets is None or len(impedance_targets) == 0):
+        logging.error("No position or impedance target is given")
+        return False
+
+    body_cmd_builder = rby.BodyComponentBasedCommandBuilder()
+
+    torso_cmd_builder = None
+    right_arm_cmd_builder = None
+    left_arm_cmd_builder = None
+
+    has_torso_command = False
+    has_right_arm_command = False
+    has_left_arm_command = False
+
+    valid_components = ["torso", "right_arm", "left_arm"]
+
+    def set_component_command(moving_component: str, cmd_builder):
+        nonlocal torso_cmd_builder
+        nonlocal right_arm_cmd_builder
+        nonlocal left_arm_cmd_builder
+        nonlocal has_torso_command
+        nonlocal has_right_arm_command
+        nonlocal has_left_arm_command
+
+        if moving_component == "torso":
+            torso_cmd_builder = cmd_builder
+            has_torso_command = True
+
+        elif moving_component == "right_arm":
+            right_arm_cmd_builder = cmd_builder
+            has_right_arm_command = True
+
+        elif moving_component == "left_arm":
+            left_arm_cmd_builder = cmd_builder
+            has_left_arm_command = True
+
+        else:
+            logging.error(f"Invalid moving_component: '{moving_component}'")
+            return False
+
+        return True
+
+    # -------------------------------------------------------------------------
+    # 1. Add Cartesian targets
+    # -------------------------------------------------------------------------
+    if position_targets is not None:
+        for i, position_target in enumerate(position_targets):
+            moving_component = position_target.get("moving_component")
+            reference_link = position_target.get("reference_link")
+            target_link = position_target.get("target_link")
+            pos = position_target.get("pos")
+            rpy = position_target.get("rpy")
+
+            target_minimum_time_PC = position_target.get(
+                "minimum_time",
+                minimum_time_PC
+            )
+            target_control_hold_time_PC = position_target.get(
+                "control_hold_time",
+                control_hold_time_PC
+            )
+            joint_targets = position_target.get("joint_targets", None)
+
+            if moving_component is None:
+                logging.error(f"position_target {i} has no 'moving_component'")
+                return False
+
+            if moving_component not in valid_components:
+                logging.error(
+                    f"position_target {i}['moving_component'] must be "
+                    "'torso', 'right_arm', or 'left_arm'"
+                )
+                return False
+
+            if reference_link is None:
+                logging.error(f"position_target {i} has no 'reference_link'")
+                return False
+
+            if target_link is None:
+                logging.error(f"position_target {i} has no 'target_link'")
+                return False
+
+            if pos is None or len(pos) != 3:
+                logging.error(f"position_target {i}['pos'] must have 3 elements")
+                return False
+
+            if rpy is None or len(rpy) != 3:
+                logging.error(f"position_target {i}['rpy'] must have 3 elements")
+                return False
+
+            T = make_HT(rpy_to_rotMat(rpy), pos)
+
+            cartesian_cmd_builder = (
+                rby.CartesianCommandBuilder()
+                .set_minimum_time(target_minimum_time_PC)
+                .set_stop_position_tracking_error(stop_position_tracking_error_PC)
+                .set_stop_orientation_tracking_error(stop_orientation_tracking_error_PC)
+                .add_target(
+                    reference_link,
+                    target_link,
+                    T,
+                    linear_velocity_limit_PC,
+                    angular_velocity_limit_PC,
+                    acceleration_limit_PC,
+                )
+            )
+
+            if target_control_hold_time_PC is not None:
+                cartesian_cmd_builder.set_command_header(
+                    rby.CommandHeaderBuilder().set_control_hold_time(target_control_hold_time_PC)
+                )
+
+            if joint_targets is not None:
+                for joint_name, joint_pos in joint_targets.items():
+                    cartesian_cmd_builder.add_joint_position_target(
+                        joint_name,
+                        float(joint_pos)
+                    )
+                    logging.info(
+                        f"Add Cartesian joint target: "
+                        f"'{joint_name}' = {joint_pos}"
+                    )
+
+            if not set_component_command(moving_component, cartesian_cmd_builder):
+                return False
+
+            logging.info(
+                f"Add Position Control target {i}: "
+                f"moving_component='{moving_component}', "
+                f"'{reference_link}'->'{target_link}', "
+                f"pos={pos}, rpy={rpy}, "
+                f"minimum_time={target_minimum_time_PC}, "
+                f"control_hold_time={target_control_hold_time_PC}"
+            )
+
+    # -------------------------------------------------------------------------
+    # 2. Add Impedance targets
+    # -------------------------------------------------------------------------
+    if impedance_targets is not None:
+        for i, impedance_target in enumerate(impedance_targets):
+            moving_component = impedance_target.get("moving_component")
+            reference_link = impedance_target.get("reference_link")
+            target_link = impedance_target.get("target_link")
+            pos = impedance_target.get("pos")
+            rpy = impedance_target.get("rpy")
+
+            translation_weight = impedance_target.get(
+                "translation_weight",
+                default_translation_weight_IC
+            )
+            rotation_weight = impedance_target.get(
+                "rotation_weight",
+                default_rotation_weight_IC
+            )
+            damping_ratio = impedance_target.get(
+                "damping_ratio",
+                default_damping_ratio_IC
+            )
+            target_control_hold_time_IC = impedance_target.get(
+                "control_hold_time",
+                control_hold_time_IC
+            )
+
+            if moving_component is None:
+                logging.error(f"impedance_target {i} has no 'moving_component'")
+                return False
+
+            if moving_component not in valid_components:
+                logging.error(
+                    f"impedance_target {i}['moving_component'] must be "
+                    "'torso', 'right_arm', or 'left_arm'"
+                )
+                return False
+
+            if reference_link is None:
+                logging.error(f"impedance_target {i} has no 'reference_link'")
+                return False
+
+            if target_link is None:
+                logging.error(f"impedance_target {i} has no 'target_link'")
+                return False
+
+            if pos is None or len(pos) != 3:
+                logging.error(f"impedance_target {i}['pos'] must have 3 elements")
+                return False
+
+            if rpy is None or len(rpy) != 3:
+                logging.error(f"impedance_target {i}['rpy'] must have 3 elements")
+                return False
+
+            if translation_weight is None or len(translation_weight) != 3:
+                logging.error(
+                    f"impedance_target {i}['translation_weight'] must have 3 elements"
+                )
+                return False
+
+            if rotation_weight is None or len(rotation_weight) != 3:
+                logging.error(
+                    f"impedance_target {i}['rotation_weight'] must have 3 elements"
+                )
+                return False
+
+            T = make_HT(rpy_to_rotMat(rpy), pos)
+
+            impedance_cmd_builder = (
+                rby.ImpedanceControlCommandBuilder()
+                .set_reference_link_name(reference_link)
+                .set_link_name(target_link)
+                .set_translation_weight(translation_weight)
+                .set_rotation_weight(rotation_weight)
+                .set_transformation(T)
+            )
+
+            # [Important] If 'control_hold_time' is 0 or None, the robot is not moving
+            if target_control_hold_time_IC is not None: 
+                impedance_cmd_builder.set_command_header(
+                    rby.CommandHeaderBuilder().set_control_hold_time(target_control_hold_time_IC)
+                )
+
+            if damping_ratio is not None:
+                impedance_cmd_builder.set_damping_ratio(float(damping_ratio))
+
+            if not set_component_command(moving_component, impedance_cmd_builder):
+                return False
+
+            logging.info(
+                f"Add Impedance target {i}: "
+                f"moving_component='{moving_component}', "
+                f"'{reference_link}'->'{target_link}', "
+                f"pos={pos}, rpy={rpy}, "
+                f"translation_weight={translation_weight}, "
+                f"rotation_weight={rotation_weight}, "
+                f"damping_ratio={damping_ratio}, "
+                f"control_hold_time={target_control_hold_time_IC}"
+            )
+
+    # -------------------------------------------------------------------------
+    # 3. Apply component commands
+    # -------------------------------------------------------------------------
+    if has_torso_command:
+        body_cmd_builder.set_torso_command(torso_cmd_builder)
+
+    if has_right_arm_command:
+        body_cmd_builder.set_right_arm_command(right_arm_cmd_builder)
+
+    if has_left_arm_command:
+        body_cmd_builder.set_left_arm_command(left_arm_cmd_builder)
+
+    if not has_torso_command and not has_right_arm_command and not has_left_arm_command:
+        logging.error("No command is applied")
+        return False
+
+    # -------------------------------------------------------------------------
+    # 4. Build robot command
+    # -------------------------------------------------------------------------
+    rc = rby.RobotCommandBuilder().set_command(
+        rby.ComponentBasedCommandBuilder().set_body_command(
+            body_cmd_builder
+        )
+    )
+
+    # -------------------------------------------------------------------------
+    # 5. Send command
+    # -------------------------------------------------------------------------
+    if get_return:
+        rv = robot.send_command(rc).get()
+
+        if rv.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
+            logging.error(
+                f"Failed to conduct Cartesian (Position + Impedance) Control. "
+                f"finish_code = {rv.finish_code}"
+            )
+            return False
+
+        UTIL.print_end_title("Cartesian (Cartesian + Impedance) Control Ends")
+        return True
+
+    rv = robot.send_command(rc)
+    UTIL.print_end_title("Cartesian (Cartesian + Impedance) Control Ends")
+    return rv
+
+
+
+def optimalCtrl_wholeBody(
+    robot,
+    position_targets: list[dict] | None = None,
+    joint_position_targets: dict | None = None,
+    center_of_mass_target: dict | None = None,
+    default_translation_weight: float = RI.WEIGHT,
+    default_rotation_weight: float = RI.WEIGHT,
+    default_joint_weight: float = RI.WEIGHT / 10,
+    velocity_limit_scaling: float | None = 0.5,
+    error_scaling: float | None = None,
+    stop_cost: float = RI.STOP_COST,
+    min_delta_cost: float = RI.MIN_DELTA_COST,
+    patience: int = RI.PATIENCE,
+    get_return: bool = True,
+):
+    """
+    Whole-Body Optimal Control
+
+    This function uses OptimalControlCommandBuilder.
+    Multiple Cartesian position targets, Joint position targets, and COM target
+    can be solved together using whole-body joints.
+
+    Args:
+        position_targets:
+            [
+                {
+                    "reference_link": "base",
+                    "target_link": "ee_right",
+                    "pos": [x, y, z],
+                    "rpy": [roll, pitch, yaw],
+
+                    # optional
+                    "translation_weight": RI.WEIGHT,
+                    "rotation_weight": RI.WEIGHT,
+                },
+                {
+                    "reference_link": "base",
+                    "target_link": "link_torso_5",
+                    "pos": [0, 0, 1.0],
+                    "rpy": [0, 0, 0],
+                    "translation_weight": RI.WEIGHT,
+                    "rotation_weight": RI.WEIGHT,
+                },
+            ]
+
+        joint_position_targets:
+            {
+                "right_arm_2": {
+                    "pos": np.pi / 2,
+                    "weight": RI.WEIGHT / 5,
+                },
+                "left_arm_2": {
+                    "pos": -np.pi / 2,
+                    "weight": RI.WEIGHT / 5,
+                },
+            }
+
+        center_of_mass_target:
+            {
+                "reference_link": "base",
+                "pos": [x, y, z],
+                "weight": RI.WEIGHT * 5,
+            }
+            
+    velocity_limit_scaling : Limitation percentage of angular velocity (0.5 = 50% of maximum velocity)
+    error_scaling          : How sensitively check the error (2 = set error as twice of original error)
+    stop_cost              : If cost is smaller than this value, then terminate
+    min_delta_cost         : If reduced cost in 1-time step is smaller than this value, we assume it is in stagnant
+    patience               : How many times we wait the stagnant state (After over patience, terminate)
+
+    [CMD structure]
+        RobotCommandBuilder
+        └── ComponentBasedCommandBuilder
+            └── OptimalControlCommandBuilder
+                ├── Cartesian targets
+                ├── Joint position targets
+                └── Center of mass target
+    """
+
+    UTIL.print_start_title("Whole-Body Optimal Control Starts")
+
+    if (position_targets is None or len(position_targets) == 0) and \
+       (joint_position_targets is None or len(joint_position_targets) == 0) and \
+       (center_of_mass_target is None):
+        logging.error("No optimal control target is given")
+        return False
+
+    # 1. Make Optimal Control Command Builder
+    optimal_control_cmd_builder = rby.OptimalControlCommandBuilder()
+
+    # 2. Add center of mass target if needed
+    if center_of_mass_target is not None:
+        com_reference_link = center_of_mass_target.get("reference_link")
+        com_pos = center_of_mass_target.get("pos")
+        com_weight = center_of_mass_target.get("weight", default_translation_weight)
+
+        if com_reference_link is None:
+            logging.error("center_of_mass_target has no 'reference_link'")
+            return False
+
+        if com_pos is None or len(com_pos) != 3:
+            logging.error("center_of_mass_target['pos'] must have 3 elements")
+            return False
+
+        if com_weight is None:
+            logging.error("center_of_mass_target has no 'weight'")
+            return False
+
+        optimal_control_cmd_builder.set_center_of_mass_target(
+            com_reference_link,
+            np.asarray(com_pos, dtype=float),
+            float(com_weight),
+        )
+
+        logging.info(
+            f"Add COM target: "
+            f"reference_link='{com_reference_link}', "
+            f"pos={com_pos}, weight={com_weight}"
+        )
+
+    # 3. Add Cartesian Position targets
+    if position_targets is not None:
+        for i, position_target in enumerate(position_targets):
+            reference_link = position_target.get("reference_link")
+            target_link = position_target.get("target_link")
+            pos = position_target.get("pos")
+            rpy = position_target.get("rpy")
+
+            translation_weight = position_target.get(
+                "translation_weight",
+                default_translation_weight
+            )
+            rotation_weight = position_target.get(
+                "rotation_weight",
+                default_rotation_weight
+            )
+
+            if reference_link is None:
+                logging.error(f"position_target {i} has no 'reference_link'")
+                return False
+
+            if target_link is None:
+                logging.error(f"position_target {i} has no 'target_link'")
+                return False
+
+            if pos is None or len(pos) != 3:
+                logging.error(f"position_target {i}['pos'] must have 3 elements")
+                return False
+
+            if rpy is None or len(rpy) != 3:
+                logging.error(f"position_target {i}['rpy'] must have 3 elements")
+                return False
+
+            if translation_weight is None:
+                logging.error(f"position_target {i} has no 'translation_weight'")
+                return False
+
+            if rotation_weight is None:
+                logging.error(f"position_target {i} has no 'rotation_weight'")
+                return False
+
+            T = make_HT(rpy_to_rotMat(rpy), pos)
+
+            optimal_control_cmd_builder.add_cartesian_target(
+                reference_link,
+                target_link,
+                T,
+                float(translation_weight),
+                float(rotation_weight),
+            )
+
+            logging.info(
+                f"Add Optimal Cartesian Position target {i}: "
+                f"'{reference_link}'->'{target_link}', "
+                f"pos={pos}, rpy={rpy}, "
+                f"translation_weight={translation_weight}, "
+                f"rotation_weight={rotation_weight}"
+            )
+
+    # 4. Add joint position targets
+    if joint_position_targets is not None:
+        for joint_name, joint_target in joint_position_targets.items():
+
+            joint_pos = joint_target.get("pos")
+            joint_weight = joint_target.get("weight", default_joint_weight)
+
+            if joint_pos is None:
+                logging.error(f"joint_position_targets['{joint_name}'] has no 'pos'")
+                return False
+
+            if joint_weight is None:
+                logging.error(f"joint_position_targets['{joint_name}'] has no 'weight'")
+                return False
+
+            optimal_control_cmd_builder.add_joint_position_target(
+                joint_name,
+                float(joint_pos),
+                float(joint_weight),
+            )
+
+            logging.info(
+                f"Add optimal joint target: "
+                f"'{joint_name}' = {joint_pos}, weight={joint_weight}"
+            )
+
+    # 5. Set optimal control options
+    if velocity_limit_scaling is not None:
+        optimal_control_cmd_builder.set_velocity_limit_scaling(
+            float(velocity_limit_scaling)
+        )
+
+    if error_scaling is not None:
+        optimal_control_cmd_builder.set_error_scaling(
+            float(error_scaling)
+        )
+
+    optimal_control_cmd_builder.set_stop_cost(stop_cost)
+    optimal_control_cmd_builder.set_min_delta_cost(min_delta_cost)
+    optimal_control_cmd_builder.set_patience(patience)
+
+    logging.info(
+        f"Optimal control options: "
+        f"velocity_limit_scaling={velocity_limit_scaling}, "
+        f"error_scaling={error_scaling}, "
+        f"stop_cost={stop_cost}, "
+        f"min_delta_cost={min_delta_cost}, "
+        f"patience={patience}"
+    )
+
+    # 6. Build robot command
+    rc = rby.RobotCommandBuilder().set_command(
+        rby.ComponentBasedCommandBuilder().set_body_command(
+            optimal_control_cmd_builder
+        )
+    )
+
+    # 7. Send command
+    if get_return:
+        rv = robot.send_command(rc, 10).get()
+
+        if rv.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
+            logging.error(
+                f"Failed to conduct Whole-Body Optimal Control. "
+                f"finish_code = {rv.finish_code}"
+            )
+            return False
+
+        UTIL.print_end_title("Whole-Body Optimal Control Ends")
+        return True
+
+    rv = robot.send_command(rc, 10)
+    UTIL.print_end_title("Whole-Body Optimal Control Ends")
+    return rv

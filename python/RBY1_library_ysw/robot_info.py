@@ -226,7 +226,6 @@ HEAD_ZERO_POS = [0.0, 0.0]
 
 
 
-
 # =============================================================================
 # Parameters for Cartesian Command
 # =============================================================================
@@ -238,6 +237,29 @@ ACCELERATION_LIMIT          = 1.0
 MINIMUM_TIME                        = 4
 STOP_ORIENTATION_TRACKING_ERROR     = 0.0001
 STOP_POSITION_TRACKING_ERROR        = 0.001
+
+
+
+# =============================================================================
+# Parameters for Impedance Control
+# =============================================================================
+
+DEFAULT_TRANSLATION_WEIGHT      = [1000, 1000, 1000]
+DEFAULT_ROTATION_WEIGHT         = [100, 100, 100]
+DEFAULT_DAMPING_RATIO           = 0.85
+
+DEFAULT_CONTROL_HOLD_TIME       = 2
+
+
+
+# =============================================================================
+# Parameters for Optimal Control
+# =============================================================================
+
+WEIGHT              = 1
+STOP_COST           = WEIGHT * WEIGHT * 2e-3
+MIN_DELTA_COST      = WEIGHT * WEIGHT * 2e-3
+PATIENCE            = 10
 
 
 
