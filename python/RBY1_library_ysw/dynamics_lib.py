@@ -290,6 +290,9 @@ def positionCtrl_joint_20dof(robot, posture, minimum_time=5.0, control_hold_time
     """
     Move only 20-DoF Body segments (torso, right_arm, left_arm)
     Index: 2 ~ 21
+
+    When use this function:
+        [rv = "function"] form is Necessary when "get_return=False"
     
     Args:
         posture:
@@ -361,6 +364,9 @@ def positionCtrl_joint_22dof(robot, posture, minimum_time=5.0, control_hold_time
     """
     Move only 22-DoF (Body + Head) segments (torso, right_arm, left_arm, neck)
     Index: 2 ~ 21
+
+    When use this function:
+        [rv = "function"] form is Necessary when "get_return=False"
     
     posture:
         {
@@ -436,6 +442,9 @@ def positionCtrl_joint_head(robot, q_head, minimum_time=2.0, control_hold_time=0
     """
     Move only 2-DoF Head segments
     Index: 22 ~ 23
+
+    When use this function:
+        [rv = "function"] form is Necessary when "get_return=False"
     
     q_head: np.array/list  # 2 dof        [head_0: yaw, head_1: pitch]
     """
@@ -486,6 +495,9 @@ def positionCtrl_cartesian_componentWise(
     Caution!!:
         "target_link" should be matched with "moving_component"  
 
+    When use this function:
+        [rv = "function"] form is Necessary when "get_return=False"    
+        
     Args:
         position_targets:
             [
@@ -739,6 +751,9 @@ def positionCtrl_cartesian_wholeBody(
 
     "joint_targets" are additional constraints to keep
 
+    When use this function: 
+        [rv = "function"] form is Necessary when "get_return=False"
+
     Args:
         position_targets:
             [
@@ -875,6 +890,9 @@ def impedanceCtrl_cartesian_componentWise(
 
     For example, if "moving_component" is "right_arm",
     then only 7-DoF right_arm joints move while other body components are fixed.
+
+    When use this function: 
+        [rv = "function"] form is Necessary when "get_return=False"    
 
     Args:
         impedance_targets:
@@ -1126,6 +1144,9 @@ def mixedCtrl_PositionAndImpedance_cartesian_componentWise(
         left_arm:
             Impedance control
             Keep ee_left relative to ee_right.
+
+    When use this function: 
+        [rv = "function"] form is Necessary when "get_return=False"
 
     Args:
         position_targets:
@@ -1480,6 +1501,10 @@ def optimalCtrl_wholeBody(
     Multiple Cartesian position targets, Joint position targets, and COM target
     can be solved together using whole-body joints.
 
+    
+    When use this function: 
+        [rv = "function"] form is Necessary when "get_return=False"
+
     Args:
         position_targets:
             [
@@ -1717,9 +1742,10 @@ def optimalCtrl_wholeBody(
 
 def gravityCompensation(
     robot,
-    torso: bool = True,
-    right_arm: bool = True,
-    left_arm: bool = True,
+    GC_ONOFF = RI.GC_SET_ON,           # ysw.GC_SET_ON or ysw.GC_SET_OFF
+    torso: bool = False,
+    right_arm: bool = False,
+    left_arm: bool = False,
     control_hold_time: float = RI.MINIMUM_TIME,
     get_return: bool = True,
 ):
@@ -1730,7 +1756,14 @@ def gravityCompensation(
     This command does not move the robot to a target pose.
     It only compensates gravity so that the selected components feel lighter.
 
+    When use this function: 
+        [rv = "function"] form is Necessary when "get_return=False"
+
     Args:
+        GC_ONOFF:
+            If ysw.GC_ON, turn on gravity compensation
+            If ysw.GC_OFF, turn off gravity compensation
+        
         torso:
             If True, turn on gravity compensation for torso.
 
@@ -1755,51 +1788,56 @@ def gravityCompensation(
                 ├── right_arm_command
                 └── left_arm_command
     """
-    UTIL.print_start_title("Gravity Compensation Starts")     
+    def make_gravityComp_cmd():
+        return (
+            rby.GravityCompensationCommandBuilder()
+            .set_command_header(
+                rby.CommandHeaderBuilder().set_control_hold_time(
+                    control_hold_time
+                )
+            )
+            .set_on(GC_ONOFF)
+        )
+    
+    if GC_ONOFF == RI.GC_SET_ON:        GC_state_str = "ON"
+    elif GC_ONOFF == RI.GC_SET_OFF:     GC_state_str = "OFF"
 
+    UTIL.print_start_title(f"Gravity Compensation {GC_state_str} Starts")     
+
+    # 1. Check the validity of parameters
+    if GC_ONOFF not in [RI.GC_SET_ON, RI.GC_SET_OFF]:
+        logging.error("Invalid GC_ONOFF parameter is entered")
+        return False
+    
     if not torso and not right_arm and not left_arm:
         logging.error("No body component is selected for gravity compensation")
         return False
 
-    # 1. Make command header
-    command_header = rby.CommandHeaderBuilder().set_control_hold_time(
-        control_hold_time
-    )
-
     # 2. Make Body Component Command Builder
     body_cmd_builder = rby.BodyComponentBasedCommandBuilder()
 
-    # 3. Torso gravity compensation
+    # 2. Torso gravity compensation
     if torso:
-        torso_cmd_builder = (
-            rby.GravityCompensationCommandBuilder()
-            .set_command_header(command_header)
-            .set_on(True)
+        body_cmd_builder = body_cmd_builder.set_torso_command(
+            make_gravityComp_cmd()
         )
-        body_cmd_builder.set_torso_command(torso_cmd_builder)
-        logging.info("'torso' gravity is compensated")
+        logging.info(f"'torso' gravity compensation is turned {GC_state_str}")
 
-    # 4. Right arm gravity compensation
+    # 3. Right arm gravity compensation
     if right_arm:
-        right_arm_cmd_builder = (
-            rby.GravityCompensationCommandBuilder()
-            .set_command_header(command_header)
-            .set_on(True)
+        body_cmd_builder = body_cmd_builder.set_right_arm_command(
+            make_gravityComp_cmd()
         )
-        body_cmd_builder.set_right_arm_command(right_arm_cmd_builder)
-        logging.info("'right_arm' gravity is compensated")
+        logging.info(f"'right_arm' gravity compensation is turned {GC_state_str}")
 
-    # 5. Left arm gravity compensation
+    # 4. Left arm gravity compensation
     if left_arm:
-        left_arm_cmd_builder = (
-            rby.GravityCompensationCommandBuilder()
-            .set_command_header(command_header)
-            .set_on(True)
+        body_cmd_builder = body_cmd_builder.set_left_arm_command(
+            make_gravityComp_cmd()
         )
-        body_cmd_builder.set_left_arm_command(left_arm_cmd_builder)
-        logging.info("'left_arm' gravity is compensated")
+        logging.info(f"'left_arm' gravity compensation is turned {GC_state_str}")
 
-    # 6. Build robot command
+    # 5. Build robot command
     rc = rby.RobotCommandBuilder().set_command(
         rby.ComponentBasedCommandBuilder().set_body_command(
             body_cmd_builder
@@ -1812,14 +1850,14 @@ def gravityCompensation(
 
         if rv.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
             logging.error(
-                f"Failed to conduct Gravity Compensation. "
+                f"Failed to turn {GC_state_str} Gravity Compensation. "
                 f"finish_code = {rv.finish_code}"
             )
             return False
 
-        UTIL.print_end_title("Gravity Compensation Ends")
+        UTIL.print_end_title(f"Gravity Compensation {GC_state_str} Ends")
         return True
 
     rv = robot.send_command(rc)
-    UTIL.print_end_title("Gravity Compensation Ends")
+    UTIL.print_end_title(f"Gravity Compensation {GC_state_str} Ends")
     return rv

@@ -17,17 +17,30 @@ def print_start_title(text: str, width: int = 80, fill: str = "*"):
     msg = f" [{text}] "
     print(msg.center(width, fill) + "\n")
     
+
 def print_end_title(text: str, width: int = 80, fill: str = "*"):
     msg = f" [{text}] "
     print("\n" + msg.center(width, fill) + "\n\n\n")
 
+
 def print_start_subtitle(text: str, width: int = 80, fill: str = "="):
     msg = f" [{text}] "
     print(msg.center(width, fill) + "\n")
+
     
 def print_end_subtitle(text: str, width: int = 80, fill: str = "="):
     msg = f" [{text}] "
     print(msg.center(width, fill) + "\n\n\n")
+
+
+def check_yN(prompt: str) -> bool:
+    while True:
+        answer = input(prompt).strip().lower()
+        if answer == "y":
+            return True
+        if answer == "n":
+            return False
+        print("Please enter 'y' or 'N'.")
 
 
 
