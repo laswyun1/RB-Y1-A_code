@@ -1711,3 +1711,115 @@ def optimalCtrl_wholeBody(
     rv = robot.send_command(rc, 10)
     UTIL.print_end_title("Whole-Body Optimal Control Ends")
     return rv
+
+
+
+
+def gravityCompensation(
+    robot,
+    torso: bool = True,
+    right_arm: bool = True,
+    left_arm: bool = True,
+    control_hold_time: float = RI.MINIMUM_TIME,
+    get_return: bool = True,
+):
+    """
+    Whole-Body Gravity Compensation Control
+
+    Turn on gravity compensation for selected body components.
+    This command does not move the robot to a target pose.
+    It only compensates gravity so that the selected components feel lighter.
+
+    Args:
+        torso:
+            If True, turn on gravity compensation for torso.
+
+        right_arm:
+            If True, turn on gravity compensation for right arm.
+
+        left_arm:
+            If True, turn on gravity compensation for left arm.
+
+        control_hold_time:
+            Duration for which gravity compensation is maintained.
+        
+        get_return:
+            If True, wait until the command finishes and return True/False.
+            If False, return the command future.
+
+    [CMD structure]
+        RobotCommandBuilder
+        └── ComponentBasedCommandBuilder
+            └── BodyComponentBasedCommandBuilder
+                ├── torso_command
+                ├── right_arm_command
+                └── left_arm_command
+    """
+    UTIL.print_start_title("Gravity Compensation Starts")     
+
+    if not torso and not right_arm and not left_arm:
+        logging.error("No body component is selected for gravity compensation")
+        return False
+
+    # 1. Make command header
+    command_header = rby.CommandHeaderBuilder().set_control_hold_time(
+        control_hold_time
+    )
+
+    # 2. Make Body Component Command Builder
+    body_cmd_builder = rby.BodyComponentBasedCommandBuilder()
+
+    # 3. Torso gravity compensation
+    if torso:
+        torso_cmd_builder = (
+            rby.GravityCompensationCommandBuilder()
+            .set_command_header(command_header)
+            .set_on(True)
+        )
+        body_cmd_builder.set_torso_command(torso_cmd_builder)
+        logging.info("'torso' gravity is compensated")
+
+    # 4. Right arm gravity compensation
+    if right_arm:
+        right_arm_cmd_builder = (
+            rby.GravityCompensationCommandBuilder()
+            .set_command_header(command_header)
+            .set_on(True)
+        )
+        body_cmd_builder.set_right_arm_command(right_arm_cmd_builder)
+        logging.info("'right_arm' gravity is compensated")
+
+    # 5. Left arm gravity compensation
+    if left_arm:
+        left_arm_cmd_builder = (
+            rby.GravityCompensationCommandBuilder()
+            .set_command_header(command_header)
+            .set_on(True)
+        )
+        body_cmd_builder.set_left_arm_command(left_arm_cmd_builder)
+        logging.info("'left_arm' gravity is compensated")
+
+    # 6. Build robot command
+    rc = rby.RobotCommandBuilder().set_command(
+        rby.ComponentBasedCommandBuilder().set_body_command(
+            body_cmd_builder
+        )
+    )
+
+    # 7. Send command
+    if get_return:
+        rv = robot.send_command(rc).get()
+
+        if rv.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
+            logging.error(
+                f"Failed to conduct Gravity Compensation. "
+                f"finish_code = {rv.finish_code}"
+            )
+            return False
+
+        UTIL.print_end_title("Gravity Compensation Ends")
+        return True
+
+    rv = robot.send_command(rc)
+    UTIL.print_end_title("Gravity Compensation Ends")
+    return rv
