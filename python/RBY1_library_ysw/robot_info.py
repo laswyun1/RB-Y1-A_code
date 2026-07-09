@@ -62,12 +62,27 @@ MODEL_UB = "ub"
 # =============================================================================
 
 DOF_HEAD        = 2
-DOF_MOBILE      = 2
+DOF_WHEEL       = 2
 DOF_TORSO       = 6
 DOF_RIGHT_ARM   = 7
 DOF_LEFT_ARM    = 7
 DOF_BODY        = 20    # Torso + Arms
 DOF_TOTAL       = 24
+
+
+# =============================================================================
+# Components Name
+# =============================================================================
+
+WHEEL                    = 'wheel'
+TORSO                    = "torso"
+RIGHT_ARM                = "right_arm"
+LEFT_ARM                 = "left_arm"
+HEAD                     = "head"
+
+BODY_COMPONENT_NAME_LIST = [TORSO, RIGHT_ARM, LEFT_ARM]
+ALL_COMPONENT_NAME_LIST  = [WHEEL, TORSO, RIGHT_ARM, LEFT_ARM, HEAD]
+
 
 
 # =============================================================================
@@ -227,7 +242,7 @@ HEAD_ZERO_POS = [0.0, 0.0]
 
 
 # =============================================================================
-# Parameters for Cartesian Command
+# Parameters for Cartesian Control
 # =============================================================================
 
 LINEAR_VELOCITY_LIMIT       = 1.5
@@ -241,14 +256,22 @@ STOP_POSITION_TRACKING_ERROR        = 0.001
 
 
 # =============================================================================
-# Parameters for Impedance Control
+# Parameters for (Cartesian) Impedance Control
 # =============================================================================
 
 DEFAULT_TRANSLATION_WEIGHT      = [1000, 1000, 1000]
 DEFAULT_ROTATION_WEIGHT         = [100, 100, 100]
 DEFAULT_DAMPING_RATIO           = 0.85
-
 DEFAULT_CONTROL_HOLD_TIME       = 2
+
+
+
+# =============================================================================
+# Parameters for (Joint) Impedance Control
+# =============================================================================
+
+DEFAULT_STIFFNESS       = 100.0
+DEFAULT_TORQUE_LIMIT    = 10.0
 
 
 

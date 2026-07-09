@@ -276,12 +276,33 @@ def get_FK(
 # =============================================================================
 def make_joint_position_command(q_list, minimum_time=5.0, control_hold_time=0.5):
     """
-    Base code for moving 22-DoF (Body: torso + right_arm + left_arm, Head)
+    Base code for Joint Position Control 22-DoF (Body: torso + right_arm + left_arm, Head)
     """
     return (rby.JointPositionCommandBuilder()
             .set_command_header(rby.CommandHeaderBuilder().set_control_hold_time(control_hold_time))
             .set_minimum_time(minimum_time)
             .set_position(q_list)
+    )
+
+
+
+def make_joint_impedance_command(
+        q_list,
+        stiffness=RI.DEFAULT_STIFFNESS,
+        damping_ratio=RI.DEFAULT_DAMPING_RATIO, 
+        torque_limit=RI.DEFAULT_TORQUE_LIMIT,
+        minimum_time=5.0, 
+        control_hold_time=0.5):
+    """
+    Base code for Joint Impedance Control 20-DoF (Body: torso + right_arm + left_arm)
+    """
+    return (rby.JointImpedanceControlCommandBuilder()
+            .set_command_header(rby.CommandHeaderBuilder().set_control_hold_time(control_hold_time))
+            .set_position(q_list)
+            .set_stiffness(stiffness)
+            .set_damping_ratio(damping_ratio)
+            .set_minimum_time(minimum_time)
+            .set_torque_limit(torque_limit)
     )
 
 
@@ -292,7 +313,7 @@ def positionCtrl_joint_20dof(robot, posture, minimum_time=5.0, control_hold_time
     Index: 2 ~ 21
 
     When use this function:
-        [rv = "function"] form is Necessary when "get_return=False"
+        [hdlr = "function"] form is Necessary when "get_return=False"
     
     Args:
         posture:
@@ -344,7 +365,7 @@ def positionCtrl_joint_20dof(robot, posture, minimum_time=5.0, control_hold_time
 
     rc = rby.RobotCommandBuilder().set_command(component_cmd_builder)
     
-    if (get_return == True):
+    if get_return:
         rv = robot.send_command(rc).get()
         
         if rv.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
@@ -353,9 +374,9 @@ def positionCtrl_joint_20dof(robot, posture, minimum_time=5.0, control_hold_time
         UTIL.print_end_title("20-DoF Joint Position Control Ends")
         return True
     else:
-        rv = robot.send_command(rc)
+        handler = robot.send_command(rc)
         UTIL.print_end_title("20-DoF Joint Position Control Ends")
-        return rv
+        return handler
 
 
 
@@ -366,7 +387,7 @@ def positionCtrl_joint_22dof(robot, posture, minimum_time=5.0, control_hold_time
     Index: 2 ~ 21
 
     When use this function:
-        [rv = "function"] form is Necessary when "get_return=False"
+        [hdlr = "function"] form is Necessary when "get_return=False"
     
     posture:
         {
@@ -392,10 +413,10 @@ def positionCtrl_joint_22dof(robot, posture, minimum_time=5.0, control_hold_time
     body_cmd_builder = rby.BodyComponentBasedCommandBuilder()
     has_body_command = False
     
-    q_torso = posture.get("torso")
-    q_right_arm = posture.get("right_arm")
-    q_left_arm = posture.get("left_arm")
-    q_head = posture.get("head")
+    q_torso = posture.get(RI.TORSO)
+    q_right_arm = posture.get(RI.RIGHT_ARM)
+    q_left_arm = posture.get(RI.LEFT_ARM)
+    q_head = posture.get(RI.HEAD)
     
     #--- Body ---#
     if q_torso is not None:
@@ -423,7 +444,7 @@ def positionCtrl_joint_22dof(robot, posture, minimum_time=5.0, control_hold_time
 
     rc = rby.RobotCommandBuilder().set_command(component_cmd_builder)
     
-    if (get_return == True):
+    if get_return:
         rv = robot.send_command(rc).get()
         
         if rv.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
@@ -432,9 +453,9 @@ def positionCtrl_joint_22dof(robot, posture, minimum_time=5.0, control_hold_time
         UTIL.print_end_title("22-DoF Joint Position Control Ends")
         return True
     else:
-        rv = robot.send_command(rc)
+        handler = robot.send_command(rc)
         UTIL.print_end_title("22-DoF Joint Position Control Ends")
-        return rv
+        return handler
 
 
 
@@ -444,7 +465,7 @@ def positionCtrl_joint_head(robot, q_head, minimum_time=2.0, control_hold_time=0
     Index: 22 ~ 23
 
     When use this function:
-        [rv = "function"] form is Necessary when "get_return=False"
+        [hdlr = "function"] form is Necessary when "get_return=False"
     
     q_head: np.array/list  # 2 dof        [head_0: yaw, head_1: pitch]
     """
@@ -457,14 +478,14 @@ def positionCtrl_joint_head(robot, q_head, minimum_time=2.0, control_hold_time=0
             .set_position(q_head)
         )
     )    
-    if (get_return == True):
+    if get_return:
         rv = robot.send_command(rc).get()
         UTIL.print_end_title("2-DoF Head Joint Position Control Ends")
         return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
     else:
-        rv = robot.send_command(rc)
+        handler = robot.send_command(rc)
         UTIL.print_end_title("2-DoF Head Joint Position Control Ends")
-        return rv
+        return handler
 
 
 
@@ -496,7 +517,7 @@ def positionCtrl_cartesian_componentWise(
         "target_link" should be matched with "moving_component"  
 
     When use this function:
-        [rv = "function"] form is Necessary when "get_return=False"    
+        [hdlr = "function"] form is Necessary when "get_return=False"    
         
     Args:
         position_targets:
@@ -555,7 +576,7 @@ def positionCtrl_cartesian_componentWise(
             logging.error(f"position_target {i} has no 'moving_component'")
             return False
 
-        if moving_component not in ["torso", "right_arm", "left_arm"]:
+        if moving_component not in RI.BODY_COMPONENT_NAME_LIST:
             logging.error(
                 f"position_target {i}['component'] must be "
                 "'torso', 'right_arm', or 'left_arm'"
@@ -582,7 +603,7 @@ def positionCtrl_cartesian_componentWise(
         T = make_HT(rpy_to_rotMat(rpy), pos)
 
         # 6. Select moving_component builder
-        if moving_component == "torso":
+        if moving_component == RI.TORSO:
             if torso_cmd_builder is None:
                 torso_cmd_builder = rby.CartesianCommandBuilder()
 
@@ -596,7 +617,7 @@ def positionCtrl_cartesian_componentWise(
             )
             has_torso_command = True
 
-        elif moving_component == "right_arm":
+        elif moving_component == RI.RIGHT_ARM:
             if right_arm_cmd_builder is None:
                 right_arm_cmd_builder = rby.CartesianCommandBuilder()
 
@@ -610,7 +631,7 @@ def positionCtrl_cartesian_componentWise(
             )
             has_right_arm_command = True
 
-        elif moving_component == "left_arm":
+        elif moving_component == RI.LEFT_ARM:
             if left_arm_cmd_builder is None:
                 left_arm_cmd_builder = rby.CartesianCommandBuilder()
 
@@ -634,7 +655,7 @@ def positionCtrl_cartesian_componentWise(
     if joint_targets is not None:
         for joint_name, joint_pos in joint_targets.items():
 
-            if joint_name.startswith("torso"):
+            if joint_name.startswith(RI.TORSO):
                 if torso_cmd_builder is None:
                     torso_cmd_builder = rby.CartesianCommandBuilder()
 
@@ -644,7 +665,7 @@ def positionCtrl_cartesian_componentWise(
                 )
                 has_torso_command = True
                 
-            elif joint_name.startswith("right_arm"):
+            elif joint_name.startswith(RI.RIGHT_ARM):
                 if right_arm_cmd_builder is None:
                     right_arm_cmd_builder = rby.CartesianCommandBuilder()
 
@@ -654,7 +675,7 @@ def positionCtrl_cartesian_componentWise(
                 )
                 has_right_arm_command = True
 
-            elif joint_name.startswith("left_arm"):
+            elif joint_name.startswith(RI.LEFT_ARM):
                 if left_arm_cmd_builder is None:
                     left_arm_cmd_builder = rby.CartesianCommandBuilder()
 
@@ -721,9 +742,9 @@ def positionCtrl_cartesian_componentWise(
         return True
 
     else:
-        rv = robot.send_command(rc)
+        handler = robot.send_command(rc)
         UTIL.print_end_title("Cartesian Position Control(Component-wise) Ends")
-        return rv
+        return handler
     
 
 
@@ -752,7 +773,7 @@ def positionCtrl_cartesian_wholeBody(
     "joint_targets" are additional constraints to keep
 
     When use this function: 
-        [rv = "function"] form is Necessary when "get_return=False"
+        [hdlr = "function"] form is Necessary when "get_return=False"
 
     Args:
         position_targets:
@@ -867,9 +888,9 @@ def positionCtrl_cartesian_wholeBody(
         return True
 
     else:
-        rv = robot.send_command(rc)
+        handler = robot.send_command(rc)
         UTIL.print_end_title("Cartesian Position Control(Whole-Body) Ends")
-        return rv
+        return handler
 
 
 
@@ -892,7 +913,7 @@ def impedanceCtrl_cartesian_componentWise(
     then only 7-DoF right_arm joints move while other body components are fixed.
 
     When use this function: 
-        [rv = "function"] form is Necessary when "get_return=False"    
+        [hdlr = "function"] form is Necessary when "get_return=False"    
 
     Args:
         impedance_targets:
@@ -989,7 +1010,7 @@ def impedanceCtrl_cartesian_componentWise(
             logging.error(f"impedance_target {i} has no 'moving_component'")
             return False
 
-        if moving_component not in ["torso", "right_arm", "left_arm"]:
+        if moving_component not in RI.BODY_COMPONENT_NAME_LIST:
             logging.error(
                 f"impedance_target {i}['moving_component'] must be "
                 "'torso', 'right_arm', or 'left_arm'"
@@ -1032,8 +1053,8 @@ def impedanceCtrl_cartesian_componentWise(
             rby.ImpedanceControlCommandBuilder()
             .set_reference_link_name(reference_link)
             .set_link_name(target_link)
-            .set_translation_weight(translation_weight)
-            .set_rotation_weight(rotation_weight)
+            .set_translation_weight(translation_weight)     # [x,y,z] based on reference_link frame
+            .set_rotation_weight(rotation_weight)           # [x,y,z] based on reference_link frame
             .set_transformation(T)
         )
 
@@ -1047,15 +1068,15 @@ def impedanceCtrl_cartesian_componentWise(
             impedance_cmd_builder.set_damping_ratio(float(damping_ratio))
 
         # 7. Select moving_component command
-        if moving_component == "torso":
+        if moving_component == RI.TORSO:
             torso_cmd_builder = impedance_cmd_builder
             has_torso_command = True
 
-        elif moving_component == "right_arm":
+        elif moving_component == RI.RIGHT_ARM:
             right_arm_cmd_builder = impedance_cmd_builder
             has_right_arm_command = True
 
-        elif moving_component == "left_arm":
+        elif moving_component == RI.LEFT_ARM:
             left_arm_cmd_builder = impedance_cmd_builder
             has_left_arm_command = True
 
@@ -1106,9 +1127,9 @@ def impedanceCtrl_cartesian_componentWise(
         return True
 
     else:
-        rv = robot.send_command(rc)
+        handler = robot.send_command(rc)
         UTIL.print_end_title("Cartesian Impedance Control(Component-wise) Ends")
-        return rv
+        return handler
     
 
 
@@ -1146,7 +1167,7 @@ def mixedCtrl_PositionAndImpedance_cartesian_componentWise(
             Keep ee_left relative to ee_right.
 
     When use this function: 
-        [rv = "function"] form is Necessary when "get_return=False"
+        [hdlr = "function"] form is Necessary when "get_return=False"
 
     Args:
         position_targets:
@@ -1210,7 +1231,7 @@ def mixedCtrl_PositionAndImpedance_cartesian_componentWise(
     has_right_arm_command = False
     has_left_arm_command = False
 
-    valid_components = ["torso", "right_arm", "left_arm"]
+    valid_components = RI.BODY_COMPONENT_NAME_LIST
 
     def set_component_command(moving_component: str, cmd_builder):
         nonlocal torso_cmd_builder
@@ -1220,15 +1241,15 @@ def mixedCtrl_PositionAndImpedance_cartesian_componentWise(
         nonlocal has_right_arm_command
         nonlocal has_left_arm_command
 
-        if moving_component == "torso":
+        if moving_component == RI.TORSO:
             torso_cmd_builder = cmd_builder
             has_torso_command = True
 
-        elif moving_component == "right_arm":
+        elif moving_component == RI.RIGHT_ARM:
             right_arm_cmd_builder = cmd_builder
             has_right_arm_command = True
 
-        elif moving_component == "left_arm":
+        elif moving_component == RI.LEFT_ARM:
             left_arm_cmd_builder = cmd_builder
             has_left_arm_command = True
 
@@ -1472,10 +1493,10 @@ def mixedCtrl_PositionAndImpedance_cartesian_componentWise(
 
         UTIL.print_end_title("Cartesian (Cartesian + Impedance) Control Ends")
         return True
-
-    rv = robot.send_command(rc)
-    UTIL.print_end_title("Cartesian (Cartesian + Impedance) Control Ends")
-    return rv
+    else:
+        handler = robot.send_command(rc)
+        UTIL.print_end_title("Cartesian (Cartesian + Impedance) Control Ends")
+        return handler
 
 
 
@@ -1503,7 +1524,7 @@ def optimalCtrl_wholeBody(
 
     
     When use this function: 
-        [rv = "function"] form is Necessary when "get_return=False"
+        [hdlr = "function"] form is Necessary when "get_return=False"
 
     Args:
         position_targets:
@@ -1732,10 +1753,10 @@ def optimalCtrl_wholeBody(
 
         UTIL.print_end_title("Whole-Body Optimal Control Ends")
         return True
-
-    rv = robot.send_command(rc, 10)
-    UTIL.print_end_title("Whole-Body Optimal Control Ends")
-    return rv
+    else:
+        handler = robot.send_command(rc, 10)
+        UTIL.print_end_title("Whole-Body Optimal Control Ends")
+        return handler
 
 
 
@@ -1757,7 +1778,7 @@ def gravityCompensation(
     It only compensates gravity so that the selected components feel lighter.
 
     When use this function: 
-        [rv = "function"] form is Necessary when "get_return=False"
+        [hdlr = "function"] form is Necessary when "get_return=False"
 
     Args:
         GC_ONOFF:
@@ -1857,7 +1878,245 @@ def gravityCompensation(
 
         UTIL.print_end_title(f"Gravity Compensation {GC_state_str} Ends")
         return True
+    else:
+        handler = robot.send_command(rc)
+        UTIL.print_end_title(f"Gravity Compensation {GC_state_str} Ends")
+        return handler
 
-    rv = robot.send_command(rc)
-    UTIL.print_end_title(f"Gravity Compensation {GC_state_str} Ends")
-    return rv
+
+
+
+# def impedanceCtrl_joint_20DoF(
+#     robot, 
+#     impedance_targets: dict,
+#     default_stiffness: float = RI.DEFAULT_STIFFNESS,
+#     default_damping_ratio: float = RI.DEFAULT_DAMPING_RATIO,
+#     default_torque_limit: float = RI.DEFAULT_TORQUE_LIMIT,
+#     default_minimum_time: float = RI.MINIMUM_TIME,
+#     default_control_hold_time: float = RI.DEFAULT_CONTROL_HOLD_TIME,     # Important!! 
+#     get_return=True
+# ):
+#     """
+#     Joint Impedance Control 
+
+#     Apply joint impedance control to selected joints.
+
+#     When use this function: 
+#         [hdlr = "function"] form is Necessary when "get_return=False"    
+
+#     Args:
+#         impedance_targets:
+#             Dictionary whose keys are component names:
+#                 "torso", "right_arm", "left_arm"
+
+#             Example:
+#                 {
+#                     "torso": {
+#                         "pos": [q2, q3, q4, q5, q6, q7],       # Joint angle position
+#                         "stiffness": [100.0] * 6,
+#                         "damping_ratio": 1.0,
+#                         "torque_limit": [10.0] * 6,
+#                         "minimum_time": 5.0,
+#                         "control_hold_time": 10.0,
+#                     }
+#                     "right_arm": {
+#                         "pos": [q8, q9, q10, q11, q12, q13, q14],
+#                         "stiffness": [100.0] * 7,
+#                         "damping_ratio": 1.0,
+#                         "torque_limit": [10.0] * 7,
+#                         "minimum_time": 5.0,
+#                         "control_hold_time": 10.0,
+#                     }
+#                     "left_arm": {
+#                         "pos": [q15, q16, q17, q18, q19, q20, q21],
+#                         "stiffness": [100.0] * 7,
+#                         "damping_ratio": 1.0,
+#                         "torque_limit": [10.0] * 7,
+#                         "minimum_time": 5.0,
+#                         "control_hold_time": 10.0,
+#                     }
+#                 }
+
+#         default_stiffness:
+#             Default joint stiffness.
+#             If scalar, it is expanded to the component DoF.
+
+#         default_damping_ratio:
+#             Default damping ratio.
+
+#         default_torque_limit:
+#             Default joint torque limit.
+#             If scalar, it is expanded to the component DoF.
+
+#         default_minimum_time:
+#             Default minimum motion time.
+
+#         default_control_hold_time:
+#             Default command hold time.
+
+#         get_return:
+#             If True, wait until the command finishes and return True/False.
+#             If False, return the command handler.
+
+#     Returns:
+#         True / False if get_return=True.
+#         Command handler if get_return=False.
+
+#     [CMD structure]
+#         RobotCommandBuilder
+#         └── ComponentBasedCommandBuilder
+#             └── BodyComponentBasedCommandBuilder
+#                 ├── torso_command
+#                 ├── right_arm_command
+#                 └── left_arm_command
+#     """    
+#     UTIL.print_start_title("Joint Impedance Control Starts")
+
+#     # 1. Argument validity check
+#     if impedance_targets is None or len(impedance_targets) == 0:
+#         logging.error("'impedance_targets' is empty")
+#         return False
+    
+#     component_dof_map = {
+#         RI.TORSO: RI.DOF_TORSO,             # 6
+#         RI.RIGHT_ARM: RI.DOF_RIGHT_ARM,     # 7
+#         RI.LEFT_ARM: RI.DOF_LEFT_ARM,       # 7
+#     }
+#     valid_components = RI.BODY_COMPONENT_NAME_LIST
+
+#     # 2. Make Body Component Command Builder
+#     body_cmd_builder = rby.BodyComponentBasedCommandBuilder()
+#     has_command = False
+
+#     # 3. Build component-wise joint impedance commands
+#     for component_name, target in impedance_targets.items():
+
+#         if component_name not in valid_components:
+#             logging.error(
+#                 f"Invalid component_name: '{component_name}'"
+#             )
+#             return False
+
+#         dof = component_dof_map[component_name]
+
+#         if "pos" not in target:
+#             logging.error(
+#                 f"'pos' is required for '{component_name}' joint impedance target"
+#             )
+#             return False
+        
+#         q_list = list(target["pos"])
+
+#         if len(q_list) != dof:
+#             logging.error(
+#                 f"'position' length of '{component_name}' must be {dof}, "
+#                 f"but got {len(q_list)}"
+#             )
+#             return False
+
+#         q_list = [float(q) for q in q_list]
+
+#         ### stiffness
+#         target_stiffness = target.get("stiffness", default_stiffness)
+
+#         if isinstance(target_stiffness, (int, float)):
+#             target_stiffness = [float(target_stiffness)] * dof
+#         else:
+#             target_stiffness = list(target_stiffness)
+
+#             if len(target_stiffness) != dof:
+#                 logging.error(
+#                     f"'stiffness' length of '{component_name}' must be {dof}, "
+#                     f"but got {len(target_stiffness)}"
+#                 )
+#                 return False
+
+#             target_stiffness = [float(v) for v in target_stiffness]
+
+#         ### torque_limit
+#         target_torque_limit = target.get("torque_limit", default_torque_limit)
+
+#         if isinstance(target_torque_limit, (int, float)):
+#             target_torque_limit = [float(target_torque_limit)] * dof
+#         else:
+#             target_torque_limit = list(target_torque_limit)
+
+#             if len(target_torque_limit) != dof:
+#                 logging.error(
+#                     f"'torque_limit' length of '{component_name}' must be {dof}, "
+#                     f"but got {len(target_torque_limit)}"
+#                 )
+#                 return False
+
+#             target_torque_limit = [float(v) for v in target_torque_limit]
+        
+#         target_damping_ratio = float(
+#             target.get("damping_ratio", default_damping_ratio)
+#         )
+
+#         target_minimum_time = float(
+#             target.get("minimum_time", default_minimum_time)
+#         )
+
+#         target_control_hold_time = float(
+#             target.get("control_hold_time", default_control_hold_time)
+#         )
+
+#         joint_impedance_cmd = make_joint_impedance_command(
+#             q_list=q_list,
+#             stiffness=target_stiffness,
+#             damping_ratio=target_damping_ratio,
+#             torque_limit=target_torque_limit,
+#             minimum_time=target_minimum_time,
+#             control_hold_time=target_control_hold_time,
+#         )
+
+#         if component_name == RI.TORSO:
+#             body_cmd_builder = body_cmd_builder.set_torso_command(
+#                 joint_impedance_cmd
+#             )
+
+#         elif component_name == RI.RIGHT_ARM:
+#             body_cmd_builder = body_cmd_builder.set_right_arm_command(
+#                 joint_impedance_cmd
+#             )
+
+#         elif component_name == RI.LEFT_ARM:
+#             body_cmd_builder = body_cmd_builder.set_left_arm_command(
+#                 joint_impedance_cmd
+#             )
+
+#         logging.info(f"Joint impedance command is set for '{component_name}'")
+#         has_command = True
+
+#     if not has_command:
+#         logging.error("No joint impedance command is generated")
+#         return False
+
+#     # 4. Build robot command
+#     rc = rby.RobotCommandBuilder().set_command(
+#         rby.ComponentBasedCommandBuilder().set_body_command(
+#             body_cmd_builder
+#         )
+#     )
+
+#     # 5. Send command
+#     if get_return:
+#         rv = robot.send_command(rc).get()
+
+#         if rv.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
+#             logging.error(
+#                 f"Failed to conduct Joint Impedance Control. "
+#                 f"finish_code = {rv.finish_code}"
+#             )
+#             return False
+
+#         UTIL.print_end_title("Joint Impedance Control Ends")
+#         return True
+
+#     else:
+#         handler = robot.send_command(rc)
+#         UTIL.print_end_title("Joint Impedance Control Command Sent")
+#         return handler
+
+
