@@ -287,6 +287,62 @@ class Gripper:
             logging.info(f"SUCCESS: [DXL ID:{dxl_id}] current_limit_raw(0~1193) = {current_limit_raw}, current_limit_A = {current_limit_A}A")
             return current_limit_A     # [A]     
         
+        
+        
+    def read_PIDgain_posCtrl(self, dxl_id: int) -> list[float]:  
+        """
+            Read PID gain of position control
+            Raw value Range: (0 ~ 16,383)
+            [Ex] gripper.read_PIDgain_posCtrl(dxl_id=ysw.GRIPPER_ID_R)
+            
+            Return:
+                List such that [Kp, Ki, Kd]
+        """     
+        val, dxl_comm_res, dxl_err = self.packet_hdlr.read2ByteTxRx(
+            self.port_hdlr,
+            dxl_id,
+            RI.DXL_ADDR_P_GAIN_POSCTRL
+        )
+        if dxl_comm_res != RI.DXL_COMM_SUCCESS:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getTxRxResult(dxl_comm_res)))
+            return None
+        elif dxl_err != RI.DXL_NO_ERROR:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
+            return None
+        else:
+            Kp = val
+            logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Kp = {Kp}")
+            
+        val, dxl_comm_res, dxl_err = self.packet_hdlr.read2ByteTxRx(
+            self.port_hdlr,
+            dxl_id,
+            RI.DXL_ADDR_I_GAIN_POSCTRL
+        )
+        if dxl_comm_res != RI.DXL_COMM_SUCCESS:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getTxRxResult(dxl_comm_res)))
+            return None
+        elif dxl_err != RI.DXL_NO_ERROR:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
+            return None
+        else:
+            Ki = val
+            logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Ki = {Ki}")
+            
+        val, dxl_comm_res, dxl_err = self.packet_hdlr.read2ByteTxRx(
+            self.port_hdlr,
+            dxl_id,
+            RI.DXL_ADDR_D_GAIN_POSCTRL
+        )
+        if dxl_comm_res != RI.DXL_COMM_SUCCESS:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getTxRxResult(dxl_comm_res)))
+            return None
+        elif dxl_err != RI.DXL_NO_ERROR:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
+            return None
+        else:
+            Kd = val
+            logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Kd = {Kd}")
+            return [Kp, Ki, Kd]
          
          
     #----------------------------------------------------------------------------
@@ -511,6 +567,70 @@ class Gripper:
         else:
             logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Goal Position [Tick]: " 
                          f"signed={goalPos_tick_signed}, uint32={goalPos_tick_uint32}")
+            return True
+        
+        
+    def write_PIDgain_posCtrl(self, dxl_id: int, Kp: int=RI.DXL_P_GAIN_POSCTRL, Ki: int=RI.DXL_I_GAIN_POSCTRL, Kd: int=RI.DXL_D_GAIN_POSCTRL) -> bool:        
+        """
+            Set P,I,D gain for DXL
+            Raw value Range (0 ~ 16,383)
+            [Ex] gripper.write_PIDgain_posCtrl(ysw.GRIPPER_ID_R, ysw.DXL_P_GAIN_POSCTRL, ysw.DXL_I_GAIN_POSCTRL, ysw.DXL_D_GAIN_POSCTRL)
+            
+            Return: 
+                True: OK
+                False: Error
+        """  
+        if (Kp < 0 or Ki < 0 or Kd < 0):     
+            logging.error("Kp, Ki, Kd values cannot be less than 0")
+            return False
+        if (Kp > RI.DXL_PID_GAIN_LIMIT or Ki > RI.DXL_PID_GAIN_LIMIT or Kd > RI.DXL_PID_GAIN_LIMIT):     
+            logging.error("Kp, Ki, Kd values cannot exceed limit(=1000)")
+            return False
+
+        dxl_comm_res, dxl_err = self.packet_hdlr.write2ByteTxRx(
+            self.port_hdlr,
+            dxl_id,
+            RI.DXL_ADDR_P_GAIN_POSCTRL,
+            Kp
+        )
+        if dxl_comm_res != RI.DXL_COMM_SUCCESS:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getTxRxResult(dxl_comm_res)))
+            return False
+        elif dxl_err != RI.DXL_NO_ERROR:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
+            return False
+        else:
+            logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Kp: {Kp}")
+
+        dxl_comm_res, dxl_err = self.packet_hdlr.write2ByteTxRx(
+            self.port_hdlr,
+            dxl_id,
+            RI.DXL_ADDR_I_GAIN_POSCTRL,
+            Ki
+        )
+        if dxl_comm_res != RI.DXL_COMM_SUCCESS:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getTxRxResult(dxl_comm_res)))
+            return False
+        elif dxl_err != RI.DXL_NO_ERROR:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
+            return False
+        else:
+            logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Ki: {Ki}")
+  
+        dxl_comm_res, dxl_err = self.packet_hdlr.write2ByteTxRx(
+            self.port_hdlr,
+            dxl_id,
+            RI.DXL_ADDR_D_GAIN_POSCTRL,
+            Kd
+        )
+        if dxl_comm_res != RI.DXL_COMM_SUCCESS:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getTxRxResult(dxl_comm_res)))
+            return False
+        elif dxl_err != RI.DXL_NO_ERROR:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
+            return False
+        else:
+            logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Kd: {Kd}")
             return True
         
         
@@ -751,3 +871,35 @@ class Gripper:
             UTIL.print_end_title(f"Gripper [DXL ID:{dxl_id}] Current-based Position Control Ends")
             return True
         return False 
+
+
+
+
+    def tune_PIDgain_posCtrl(self, dxl_id: int, Kp: int=RI.DXL_P_GAIN_POSCTRL, Ki: int=RI.DXL_I_GAIN_POSCTRL, Kd: int=RI.DXL_D_GAIN_POSCTRL) -> bool:
+        """
+            Setting the PID gain of Position Control of Gripper
+            After use this function, the setting is maintained.
+                
+            [Ex]
+                gripper.tune_PIDgain_posCtrl(ysw.GRIPPER_ID_R, 800, 10, 0)   # close
+        """
+        UTIL.print_start_title(f"Gripper [DXL ID:{dxl_id}] Tuning PID gain for Position Control Starts")
+        
+        if (dxl_id is None) or (dxl_id not in [RI.GRIPPER_ID_R, RI.GRIPPER_ID_L]):
+            logging.error("Invalid DXL ID")
+            return False
+
+        if dxl_id not in self.dxl_activated:
+            logging.error(f"[DXL ID:{dxl_id}] is NOT activated")
+            return False
+        
+        [Kp_old, Ki_old, Kd_old] = self.read_PIDgain_posCtrl(dxl_id)
+        logging.info(f"[DXL ID:{dxl_id}] Original PID gain: Kp={Kp_old}, Ki={Ki_old}, Kd={Kd_old}")
+        
+        self.write_PIDgain_posCtrl(dxl_id, Kp, Ki, Kd)
+        
+        [Kp_new, Ki_new, Kd_new] = self.read_PIDgain_posCtrl(dxl_id)
+        logging.info(f"[DXL ID:{dxl_id}] Newly tuned PID gain: Kp={Kp_new}, Ki={Ki_new}, Kd={Kd_new}")
+         
+        UTIL.print_end_title(f"Gripper [DXL ID:{dxl_id}] Tuning PID gain for Position Control Ends")
+        return True

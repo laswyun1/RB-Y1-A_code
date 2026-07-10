@@ -317,7 +317,8 @@ GRIPPER_POS_RANGE_LINEAR                = 91.0                  # Unit: mm      
 GRIPPER_POS_SCALE_LINEAR_TO_TICK_R      = int(GRIPPER_POS_RANGE_TICK_R / 91.0)     # Unit: tick/mm
 GRIPPER_POS_SCALE_LINEAR_TO_TICK_L      = int(GRIPPER_POS_RANGE_TICK_L / 91.0)     # Unit: tick/mm
 
-
+GRIPPER_POS_ERROR_TOLERANCE             = 1       # Unit: mm  (Manually set)
+ 
 DXL_PROTOCOL_VERSION                    = 2.0
 DXL_BAUDRATE                            = 2000000
 
@@ -325,6 +326,9 @@ DXL_ADDR_OPERATING_MODE                 = 11      # 0: Current Control / 1: Velo
 DXL_ADDR_CURRENT_LIMIT                  = 38      # 0 ~ 1193
 DXL_ADDR_TORQUE_ENABLE                  = 64      # 0: Turn OFF(default) / 1: Turn ON
 DXL_ADDR_LED                            = 65      # 0: Turn OFF(default) / 1: Turn ON
+DXL_ADDR_D_GAIN_POSCTRL                 = 80      # default: 0      range: 0~16,383
+DXL_ADDR_I_GAIN_POSCTRL                 = 82      # default: 0      range: 0~16,383
+DXL_ADDR_P_GAIN_POSCTRL                 = 84      # default: 800    range: 0~16,383
 DXL_ADDR_GOAL_CURRENT                   = 102
 DXL_ADDR_GOAL_POSITION                  = 116   
 DXL_ADDR_PRESENT_CURRENT                = 126     # Unit: 2.69mA
@@ -357,7 +361,14 @@ DXL_CURRENT_LIMIT_MAX_RAW_YSW           = 50                # Unit: 2.69mA      
 DXL_COMM_SUCCESS                        = 0
 DXL_NO_ERROR                            = 0
 
+DXL_P_GAIN_POSCTRL_DEFAULT              = 800           # By RainbowRobotics
+DXL_I_GAIN_POSCTRL_DEFAULT              = 0             # By RainbowRobotics
+DXL_D_GAIN_POSCTRL_DEFAULT              = 4000          # By RainbowRobotics
 
+DXL_P_GAIN_POSCTRL                      = 500
+DXL_I_GAIN_POSCTRL                      = 0
+DXL_D_GAIN_POSCTRL                      = 2000
+DXL_PID_GAIN_LIMIT                      = 5000          # Manually setting for hazard (you can change this)
 
 DEMO_GRIP_CURRENT_R             = 0.8
 DEMO_GRIP_CURRENT_L             = 0.6

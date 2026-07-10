@@ -47,7 +47,7 @@ gripper.test_ping()
 gripper.initialize_setting(dxl_id=ysw.GRIPPER_ID_R, operation_mode=ysw.DXL_CURRENT_CONTROL_MODE)
 gripper.initialize_setting(dxl_id=ysw.GRIPPER_ID_L, operation_mode=ysw.DXL_CURRENT_CONTROL_MODE)    
     
-trial = 5
+trial = 3
 for i in range(trial):
     print(f"[Trial {i+1}/{trial}]")
     gripper.write_current_ampere(ysw.GRIPPER_ID_R, -0.02)

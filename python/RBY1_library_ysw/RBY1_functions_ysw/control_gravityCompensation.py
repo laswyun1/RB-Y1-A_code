@@ -28,16 +28,18 @@ import time
 # =============================================================================
 ysw.setupLogging()
 # MODE_DIRECT_UPC
-robotConfig = ysw.setRobotConfig(ysw.MODE_SIM, ysw.MODEL_A)
+robotConfig = ysw.setRobotConfig(ysw.MODE_DIRECT_UPC, ysw.MODEL_A)
 robot = ysw.initialize(robotConfig.mode, robotConfig.address, robotConfig.model, option=ysw.CONNECT_ONLY)
 
 
-print("[Control: Gravity Compensation] Starts")
+print("[Gravity Compensation] Starts")
 
 
-torso_GC_used = ysw.check_yN(
-    "Turn ON the Gravity Compensation of 'torso' [y/N]: "
-)
+torso_GC_used = False
+## Need Caution for torso GC !!
+# torso_GC_used = ysw.check_yN(
+#     "Turn ON the Gravity Compensation of 'torso' [y/N]: "
+# )
 right_arm_GC_used = ysw.check_yN(
     "Turn ON the Gravity Compensation of 'right_arm' [y/N]: "
 )
@@ -79,4 +81,4 @@ else:
             control_hold_time=1.0,
             get_return=True
         )
-        print("[Control: Gravity Compensation] Ends")
+        print("[Gravity Compensation] Ends")
