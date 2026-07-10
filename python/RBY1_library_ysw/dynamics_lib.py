@@ -252,9 +252,9 @@ def get_FK(
 
     result = {
         "T": T_ref_target,
-        "position": pos,
-        "rotation": rotMat,
-        "rpy": rpy
+        "position": pos,        # [m]
+        "rotation": rotMat,     # [rad]
+        "rpy": rpy              # [rad]
     }
 
     print("[Result]\n")

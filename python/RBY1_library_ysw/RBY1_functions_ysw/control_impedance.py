@@ -1,4 +1,6 @@
 # Impedance Control Test
+# Default: reference link is "base"
+# You can change the reference/target links and 
 # 
 # Usage example:
 #       (Remotely connect to Real RBY1-A robot UPC)
@@ -28,57 +30,89 @@ import time
 # =============================================================================
 ysw.setupLogging()
 # MODE_DIRECT_UPC
-robotConfig = ysw.setRobotConfig(ysw.MODE_DIRECT_UPC, ysw.MODEL_A)
+robotConfig = ysw.setRobotConfig(ysw.MODE_SIM, ysw.MODEL_A)
 robot = ysw.initialize(robotConfig.mode, robotConfig.address, robotConfig.model, option=ysw.CONNECT_ONLY)
 
 
 print("[Impedance Control] Starts")
 
 
-torso_GC_used = False
 ## Need Caution for torso GC !!
-# torso_GC_used = ysw.check_yN(
-#     "Turn ON the Gravity Compensation of 'torso' [y/N]: "
-# )
-right_arm_GC_used = ysw.check_yN(
-    "Turn ON the Gravity Compensation of 'right_arm' [y/N]: "
+torso_IC_used = ysw.check_yN(
+    "Turn ON the Impedance Control of 'torso' [y/N]: "
 )
-left_arm_GC_used = ysw.check_yN(
-    "Turn ON the Gravity Compensation of 'left_arm' [y/N]: "
+right_arm_IC_used = ysw.check_yN(
+    "Turn ON the Impedance Control of 'right_arm' [y/N]: "
+)
+left_arm_IC_used = ysw.check_yN(
+    "Turn ON the Impedance Control of 'left_arm' [y/N]: "
 )
 
 control_hold_time_used = float(input("Enter the 'control_hold_time': "))
 
-
-if not torso_GC_used and not right_arm_GC_used and not left_arm_GC_used:
-    print("No component is selected. Gravity compensation is not started.")
+if not torso_IC_used and not right_arm_IC_used and not left_arm_IC_used:
+    print("No component is selected. Impedance Control is not started.")
 else:
+    ### Get current pos and rpy
+    HT_torso = ysw.get_FK(robot, reference_link="base", target_link="link_torso_5")
+    HT_right = ysw.get_FK(robot, reference_link="base", target_link="ee_right")
+    HT_left  = ysw.get_FK(robot, reference_link="base", target_link="ee_left")
+
+    pos_torso = HT_torso['position']
+    pos_right = HT_right['position']
+    pos_left  = HT_left['position']
+    rpy_torso = HT_torso['rpy']
+    rpy_right = HT_right['rpy']
+    rpy_left  = HT_left['rpy']
+
+    ### Impedance Position Control example (Component-wise version)
+    impedance_targets_sample = [    
+        {
+            "moving_component": "torso",
+            "reference_link": "base",
+            "target_link": "link_torso_5",
+            "pos": pos_torso,                   
+            "rpy": rpy_torso,
+            "translation_weight": [1000, 1000, 1000],
+            "rotation_weight": [100, 100, 100],
+            "damping_ratio": 0.9
+        },
+        {
+            "moving_component": "right_arm",
+            "reference_link": "base",
+            "target_link": "ee_right",
+            "pos": pos_right,          
+            "rpy": rpy_right,
+            "translation_weight": [1000, 1000, 1000],
+            "rotation_weight": [50, 50, 50],
+            "damping_ratio": 0.85,
+        },  
+        {
+            "moving_component": "left_arm",
+            "reference_link": "base",
+            "target_link": "ee_left",
+            "pos": pos_left,          
+            "rpy": rpy_left,
+            "translation_weight": [1000, 1000, 1000],
+            "rotation_weight": [50, 50, 50],
+            "damping_ratio": 0.85,
+        },                      
+    ]
+
     handler = None
     try:
-        handler = ysw.gravityCompensation(
-            robot,
-            GC_ONOFF=ysw.GC_SET_ON,
-            torso=torso_GC_used,
-            right_arm=right_arm_GC_used,
-            left_arm=left_arm_GC_used,
+        handler = ysw.impedanceCtrl_cartesian_componentWise(
+            robot, 
+            impedance_targets=impedance_targets_sample, 
             control_hold_time=control_hold_time_used,
             get_return=False
         )
-        print("Gravity compensation is running. Press Ctrl+C to stop.")
+        print("Impedance Controlis running. Press Ctrl+C to stop.")
         while True:
             time.sleep(1.0)
 
     except KeyboardInterrupt:
-        print("Gravity compensation stopped by USER.")
+        print("Impedance Control stopped by USER.")
 
     finally:
-        ysw.gravityCompensation(
-            robot,
-            GC_ONOFF=ysw.GC_SET_OFF,
-            torso=torso_GC_used,
-            right_arm=right_arm_GC_used,
-            left_arm=left_arm_GC_used,
-            control_hold_time=1.0,
-            get_return=True
-        )
         print("[Impedance Control] Ends")

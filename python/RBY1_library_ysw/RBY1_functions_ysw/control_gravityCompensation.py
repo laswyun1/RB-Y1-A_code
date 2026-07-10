@@ -51,7 +51,7 @@ control_hold_time_used = float(input("Enter the 'control_hold_time': "))
 
 
 if not torso_GC_used and not right_arm_GC_used and not left_arm_GC_used:
-    print("No component is selected. Gravity compensation is not started.")
+    print("No component is selected. Gravity Compensation is not started.")
 else:
     handler = None
     try:
@@ -64,12 +64,12 @@ else:
             control_hold_time=control_hold_time_used,
             get_return=False
         )
-        print("Gravity compensation is running. Press Ctrl+C to stop.")
+        print("Gravity Compensation is running. Press Ctrl+C to stop.")
         while True:
             time.sleep(1.0)
 
     except KeyboardInterrupt:
-        print("Gravity compensation stopped by USER.")
+        print("Gravity Compensation stopped by USER.")
 
     finally:
         ysw.gravityCompensation(
