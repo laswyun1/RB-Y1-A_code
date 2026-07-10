@@ -30,7 +30,7 @@ import time
 # =============================================================================
 ysw.setupLogging()
 # MODE_DIRECT_UPC
-robotConfig = ysw.setRobotConfig(ysw.MODE_SIM, ysw.MODEL_A)
+robotConfig = ysw.setRobotConfig(ysw.MODE_DIRECT_UPC, ysw.MODEL_A)
 robot = ysw.initialize(robotConfig.mode, robotConfig.address, robotConfig.model, option=ysw.CONNECT_ONLY)
 
 
@@ -73,9 +73,9 @@ else:
             "target_link": "link_torso_5",
             "pos": pos_torso,                   
             "rpy": rpy_torso,
-            "translation_weight": [1000, 1000, 1000],
+            "translation_weight": [1500, 1500, 1500],
             "rotation_weight": [100, 100, 100],
-            "damping_ratio": 0.9
+            "damping_ratio": 0.2
         },
         {
             "moving_component": "right_arm",
@@ -83,9 +83,9 @@ else:
             "target_link": "ee_right",
             "pos": pos_right,          
             "rpy": rpy_right,
-            "translation_weight": [1000, 1000, 1000],
+            "translation_weight": [500, 500, 500],
             "rotation_weight": [50, 50, 50],
-            "damping_ratio": 0.85,
+            "damping_ratio": 0.7,
         },  
         {
             "moving_component": "left_arm",
@@ -93,9 +93,9 @@ else:
             "target_link": "ee_left",
             "pos": pos_left,          
             "rpy": rpy_left,
-            "translation_weight": [1000, 1000, 1000],
+            "translation_weight": [500, 500, 500],
             "rotation_weight": [50, 50, 50],
-            "damping_ratio": 0.85,
+            "damping_ratio": 0.7,
         },                      
     ]
 
