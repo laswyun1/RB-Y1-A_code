@@ -39,6 +39,6 @@ q_head_seq = [
                 [0.0 * ysw.DEG2RAD, 0.0 * ysw.DEG2RAD],
             ]
 for q_head in q_head_seq:
-    ysw.positionCtrl_joint_head(robot, q_head, minimum_time=1.0, control_hold_time=0.5, get_return=True)
+    ysw.positionCtrl_joint_head(robot, q_head, minimum_time=0.5, control_hold_time=0.5, get_return=True)
 
 print("[Head Move Test] Ends")

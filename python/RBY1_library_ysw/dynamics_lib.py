@@ -481,7 +481,7 @@ def positionCtrl_joint_head(robot, q_head, minimum_time=2.0, control_hold_time=0
     if get_return:
         rv = robot.send_command(rc).get()
         UTIL.print_end_title("2-DoF Head Joint Position Control Ends")
-        return rc.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
+        return rv.finish_code == rby.RobotCommandFeedback.FinishCode.Ok
     else:
         handler = robot.send_command(rc)
         UTIL.print_end_title("2-DoF Head Joint Position Control Ends")
