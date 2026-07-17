@@ -231,6 +231,11 @@ GRIPPER_DEBUG_POS = {"torso":     np.deg2rad([0.0, 80.0, -140.0,   60.0, 0.0,   
                      "left_arm":  np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0, -20.0, 0.0]),
                      "head":      np.deg2rad([0.0, 0.0])}
 
+DEMO_POS =  {"torso":     np.deg2rad([0.0, 30.0, -60.0,   30.0, 0.0,  0.0]),
+             "right_arm": np.deg2rad([0.0, -20.0,   0.0, -120.0, 0.0, 70.0, 90.0]),
+             "left_arm":  np.deg2rad([0.0,  20.0,   0.0, -120.0, 0.0, 70.0, -90.0]),
+             "head":      np.deg2rad([0.0, 30.0])}
+
 
 
 # =============================================================================
@@ -381,11 +386,11 @@ DEMO_LAY_CURRENT_END            = 0.0
 
 
 # =============================================================================
-# Vision HSV mask 
-# [([Lower bound 1], [upper bound 1]), ([Lower bound 2], [upper bound 2]), ...]
+# Vision Colored Object Detection: HSV mask 
+# (Ex): [([Lower bound 1], [upper bound 1]), ([Lower bound 2], [upper bound 2]), ...]
 # =============================================================================
 
-HSV_MASK_RED = [(np.array([0, 80, 80]), np.array([10, 255, 255])),
-                (np.array([170, 80, 80]), np.array([180, 255, 255]))]
+HSV_MASK_RED    = [(np.array([0, 80, 80]), np.array([10, 255, 255])),
+                   (np.array([170, 80, 80]), np.array([180, 255, 255]))]
 
-
+HSV_MASK_BLACK  = [(np.array([0, 0, 0]), np.array([179, 255, 30]))]

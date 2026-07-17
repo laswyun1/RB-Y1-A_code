@@ -1,0 +1,28 @@
+[URDF File explanation]
+
+1. Sequence
+    link "base" 
+    -> joint "torso_0" 
+    -> link "link_torso_0" 
+    -> joint "torso_1"
+    -> link "link_torso_1"
+    -> ...
+
+
+2. Frame 
+    joint "torso_0"    : reference frame = link "base" frame(rpy=0,0,0, xyz=0,0,0)
+
+    link "link_torso_0": "link_torso_0" frame's origin is SAME as joint "torso_0" frame's origin.
+                         but if joint "torso_0" rotates, "link_torso_0" frame also rotates 
+                         Howerver, joint "torso_0" frame does NOT actually rotates, but it just provide revolution(axis + angle)
+                         Thus, the frames of "joint torso_0" and "link link_torso_0" have "Same" origin position, but "Different" orientation
+
+    joint "torso_1"    : reference frame = link "link_torso_0" frame
+                         Thus, joint "torso_1" frame has [rpy/xyz] relative to link "link_torso_0" frame  
+
+
+3. Link - inertial 
+    This is the CoM rpy and xyz of link based on [link's frame] 
+    rpy/xyz: calculated based on "link's frame"
+    It does not important for FK/IK 
+
