@@ -129,7 +129,7 @@ def rotMat_y(pitch: float=0.0) -> np.ndarray:
     return Ry 
 
 
-def rotMat_y(yaw: float=0.0) -> np.ndarray:
+def rotMat_z(yaw: float=0.0) -> np.ndarray:
     """Build a 3x3 Rotation Matrix for Z-axis rotation
 
     Args:

@@ -235,9 +235,9 @@ GRIPPER_DEBUG_POS = {"torso":     np.deg2rad([0.0, 80.0, -140.0,   60.0, 0.0,   
                      "head":      np.deg2rad([0.0, 0.0])}
 
 DEMO_POS =  {"torso":     np.deg2rad([0.0, 30.0, -60.0,   30.0, 0.0,  0.0]),
-             "right_arm": np.deg2rad([0.0, -20.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
-             "left_arm":  np.deg2rad([0.0,  20.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
-             "head":      np.deg2rad([0.0, 30.0])}
+             "right_arm": np.deg2rad([0.0, -23.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
+             "left_arm":  np.deg2rad([0.0,  23.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
+             "head":      np.deg2rad([0.0, 45.0])}
 
 
 
@@ -386,6 +386,8 @@ DEMO_LAY_CURRENT_L              = -0.03
 DEMO_ZEROING_CURRENT_L          = 0.03
 DEMO_LAY_CURRENT_END            = 0.0
 
+GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER = -0.03
+
 
 
 # =============================================================================
@@ -397,3 +399,15 @@ HSV_MASK_RED    = [(np.array([0, 80, 80]), np.array([10, 255, 255])),
                    (np.array([170, 80, 80]), np.array([180, 255, 255]))]
 
 HSV_MASK_BLACK  = [(np.array([0, 0, 0]), np.array([179, 255, 30]))]
+
+HSV_MASK_SILVER = [(np.array([0, 0, 80]), np.array([180, 60, 255]))]
+
+
+
+# =============================================================================
+# D435i Parameters
+# =============================================================================
+D435I_Z_OFFSET_FROM_LINK_HEAD_2 = 0.065
+
+
+

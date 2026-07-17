@@ -9,6 +9,20 @@
 # Author: Seungwon Yun
 
 
+
+# =============================================================================
+# Info
+# =============================================================================
+"""
+When viewed from the front of the D435i,
+    Origin: camera's center
+    Coordinate: 
+        Right-to-Left = X-axis, 
+        Top-to-Bottom = Y-axis,
+        Orthogonal from camera = Z-axis (or Depth "z")  
+"""
+
+
 # =============================================================================
 # Import
 # =============================================================================
@@ -227,7 +241,7 @@ class D435i:
     
     def detectColorObjectContour(self, color_image, depth_frame, mask_list, minimum_area):
         """
-        Detect colored objects using contour.
+        Detect colored objects using contour and calculate 2D bounding box.
 
         args:
             color_image: BGR image
@@ -337,9 +351,220 @@ class D435i:
 
     
     
+    def detectColorObjectContour3D(self, color_image, depth_frame, mask_list, minimum_area):
+        """
+        Detect colored objects using contour and calculate 3D bounding box.
+
+        return:
+            detected_objects
+            color_image
+            mask_total
+        """
+
+        hsv = cv2.cvtColor(color_image, cv2.COLOR_BGR2HSV)      # Convert BGR to HSV
+
+        # Masking (pixel in range->white(255), pixel out of range->black(0))
+        mask_total = np.zeros(hsv.shape[:2], dtype=np.uint8)
+
+        for lower, upper in mask_list:
+            lower = np.array(lower, dtype=np.uint8)
+            upper = np.array(upper, dtype=np.uint8)
+            mask = cv2.inRange(hsv, lower, upper)
+            mask_total = cv2.bitwise_or(mask_total, mask)   # Append
+
+        # Remove noise
+        kernel = np.ones((5, 5), np.uint8)
+        mask_total = cv2.morphologyEx(mask_total, cv2.MORPH_OPEN, kernel)   # remove outside small white noise
+        mask_total = cv2.morphologyEx(mask_total, cv2.MORPH_CLOSE, kernel)  # remove inside small black noise
+
+        contours, _ = cv2.findContours(
+            mask_total,
+            cv2.RETR_EXTERNAL,          # Only find outmost contour
+            cv2.CHAIN_APPROX_SIMPLE     # compress and save contour points 
+        )
+
+        detected_objects = []
+        height, width = mask_total.shape
+
+        for contour in contours:
+            area = cv2.contourArea(contour)
+
+            if area < minimum_area:
+                continue
+
+            # Create mask for each object contour
+            object_mask = np.zeros(mask_total.shape, dtype=np.uint8)
+            cv2.drawContours(object_mask, [contour], -1, 255, thickness=-1)     # fill in the contour with white color
+
+            # Get pixels inside contour
+            ys, xs = np.where(object_mask == 255)
+
+            points_3d = []
+
+            # Sampling for fast calculation
+            sample_step = 3
+
+            for u, v in zip(xs[::sample_step], ys[::sample_step]):
+                if u < 0 or u >= width or v < 0 or v >= height:
+                    continue
+                
+                depth = depth_frame.get_distance(int(u), int(v))
+                if depth <= 0:
+                    continue
+
+                X, Y, Z = self.get3DPos(depth_frame, [u, v])    
+
+                points_3d.append([X, Y, Z])
+
+            if len(points_3d) == 0:
+                continue
+
+            points_3d = np.array(points_3d)
+
+            # 3D center position (Mean)
+            center_3d = np.mean(points_3d, axis=0)
+
+            # 3D center position (Median -> recommended)
+            center_3d_median = np.median(points_3d, axis=0)
+
+            # Axis-aligned 3D bounding box
+            min_3d = np.min(points_3d, axis=0)
+            max_3d = np.max(points_3d, axis=0)
+
+            size_3d = max_3d - min_3d
+
+            Xc, Yc, Zc = center_3d_median
+
+            object_id = len(detected_objects)
+
+            # 2D contour centroid for drawing
+            M = cv2.moments(contour)
+
+            if M["m00"] != 0:       # If 3D bbox is allowable
+                u_center = int(M["m10"] / M["m00"])
+                v_center = int(M["m01"] / M["m00"])
+            else:                   # If 3D bbox is not allowable
+                x, y, w, h = cv2.boundingRect(contour)
+                u_center = x + w // 2
+                v_center = y + h // 2
+
+            detected_objects.append({
+                "id": object_id,
+                "area_2d": area,
+                "pixel_center": [u_center, v_center],
+                "points_3d": points_3d,
+                "center_3d": center_3d_median.tolist(),
+                "bbox_3d_min": min_3d.tolist(),
+                "bbox_3d_max": max_3d.tolist(),
+                "bbox_3d_size": size_3d.tolist(),
+            })
+
+            # Draw contour, not just 2D bbox
+            cv2.drawContours(color_image, [contour], -1, (255, 0, 0), 2)
+
+            cv2.circle(
+                color_image,
+                (u_center, v_center),
+                5,
+                (0, 0, 255),
+                -1
+            )
+
+            cv2.putText(
+                color_image,
+                f"id:{object_id} center=({Xc:.3f},{Yc:.3f},{Zc:.3f})",
+                (u_center + 10, v_center - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                (0, 255, 0),
+                2
+            )
+
+        cv2.putText(
+            color_image,
+            f"Detected objects: {len(detected_objects)}",
+            (20, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (255, 255, 255),
+            2
+        )
+
+        return detected_objects, color_image, mask_total
     
     
     
     
+
+
+
+
+
+
+
+
+
+def average_detectColorObjectContour3D(samples):
+    """
+    Average the samples obtained by "detectColorObjectContour3D" function
+    """
+
+    if len(samples) == 0:
+        return None
+
+    area_2d_list = np.array([s["area_2d"] for s in samples])
+    pixel_center_list = np.array([s["pixel_center"] for s in samples])
+    center_3d_list = np.array([s["center_3d"] for s in samples])
+    bbox_3d_size_list = np.array([s["bbox_3d_size"] for s in samples])
+    bbox_3d_min_list = np.array([s["bbox_3d_min"] for s in samples])
+    bbox_3d_max_list = np.array([s["bbox_3d_max"] for s in samples])
+
+    result = {
+        "num_samples": len(samples),
+
+        "area_2d_avg": float(np.mean(area_2d_list)),
+        "area_2d_median": float(np.median(area_2d_list)),
+
+        "pixel_center_avg": np.mean(pixel_center_list, axis=0),
+        "pixel_center_median": np.median(pixel_center_list, axis=0),
+
+        "center_3d_avg": np.mean(center_3d_list, axis=0),
+        "center_3d_median": np.median(center_3d_list, axis=0),
+
+        "bbox_3d_size_avg": np.mean(bbox_3d_size_list, axis=0),
+        "bbox_3d_size_median": np.median(bbox_3d_size_list, axis=0),
+
+        "bbox_3d_min_avg": np.mean(bbox_3d_min_list, axis=0),
+        "bbox_3d_min_median": np.median(bbox_3d_min_list, axis=0),
+
+        "bbox_3d_max_avg": np.mean(bbox_3d_max_list, axis=0),
+        "bbox_3d_max_median": np.median(bbox_3d_max_list, axis=0),
+    }
+
+    return result
+
+
+
+def convertPos_vision_to_head2(pos_vision):
+    """
+    This function converts 3D position value from vision camera frame to "link_head_2" frame
+    
+    args:
+        3D position based on D435i frame: pos_vision = np.array([pos_x, pos_y, pos_z])
+        
+    return:
+        3D position based on "link_head_2" frame
+    """
+    pos_vision = np.asarray(pos_vision, dtype=np.float64)
+    
+    pos_x = pos_vision[0]
+    pos_y = pos_vision[1]
+    pos_z = pos_vision[2]
+    
+    X = pos_z
+    Y = -pos_x
+    Z = -pos_y + RI.D435I_Z_OFFSET_FROM_LINK_HEAD_2
+    
+    return np.array([X, Y, Z], dtype=np.float64)
     
     

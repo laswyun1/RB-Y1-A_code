@@ -197,7 +197,8 @@ def getState(robot):
     robot_state = robot.get_state()
     print(repr(robot_state))
     
-    UTIL.print_end_title("Robot State Ends")    
+    UTIL.print_end_title("Robot State Ends")  
+    return robot_state  
     
     
     
