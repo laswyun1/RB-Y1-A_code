@@ -33,6 +33,7 @@ POSITION_UNIT = [RAD, DEG, TICK, MM]
 
 MODE_SIM = "SIM"
 MODE_LOCAL_COMPUTER = "Local COM"
+MODE_LOCAL_COMPUTER_PML_WIFI = "PML"
 MODE_DIRECT_UPC = "Direct UPC"
 
 
@@ -44,6 +45,8 @@ MODE_DIRECT_UPC = "Direct UPC"
 ADDRESS_SIM = "localhost:50051"
 ADDRESS_UPC = "192.168.30.1:50051"
 ADDRESS_RPC = "192.168.12.1:50051"
+
+ADDRESS_PML_WIFI = "192.168.1.217:50051"    # (Can be changed from UPC ipv4 setting)
 
 
 
@@ -232,8 +235,8 @@ GRIPPER_DEBUG_POS = {"torso":     np.deg2rad([0.0, 80.0, -140.0,   60.0, 0.0,   
                      "head":      np.deg2rad([0.0, 0.0])}
 
 DEMO_POS =  {"torso":     np.deg2rad([0.0, 30.0, -60.0,   30.0, 0.0,  0.0]),
-             "right_arm": np.deg2rad([0.0, -20.0,   0.0, -120.0, 0.0, 70.0, 90.0]),
-             "left_arm":  np.deg2rad([0.0,  20.0,   0.0, -120.0, 0.0, 70.0, -90.0]),
+             "right_arm": np.deg2rad([0.0, -20.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
+             "left_arm":  np.deg2rad([0.0,  20.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
              "head":      np.deg2rad([0.0, 30.0])}
 
 

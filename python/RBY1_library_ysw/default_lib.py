@@ -44,6 +44,8 @@ def setRobotConfig(operation_mode, operation_model) -> RobotConfig:
         address = RI.ADDRESS_SIM
     elif operation_mode == RI.MODE_LOCAL_COMPUTER:
         address = RI.ADDRESS_UPC
+    elif operation_mode == RI.MODE_LOCAL_COMPUTER_PML_WIFI:
+        address = RI.ADDRESS_PML_WIFI
     elif operation_mode == RI.MODE_DIRECT_UPC:
         address = RI.ADDRESS_UPC
     else:
