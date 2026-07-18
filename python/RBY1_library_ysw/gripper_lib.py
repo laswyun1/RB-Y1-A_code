@@ -711,6 +711,31 @@ class Gripper:
         return True
     
     
+    def enable(self, dxl_id=None) -> bool:
+        """
+            Enable Torque mode of Gripper (Free to move by external force)
+            Essentially same as "write_torque_mode" function
+            [Ex] gripper.enable(dxl_id=ysw.GRIPPER_ID_R)
+            
+            Return:
+                True: succesfully enabled
+                False: not enabled
+        """
+        UTIL.print_start_title(f"Gripper [DXL ID:{dxl_id}] Enable Starts")
+
+        if (dxl_id is None) or (dxl_id not in [RI.GRIPPER_ID_R, RI.GRIPPER_ID_L]):
+            logging.error("Invalid DXL ID")
+            return False
+
+        self.write_torque_mode(
+            dxl_id=dxl_id,
+            torque_mode=RI.DXL_TORQUE_ENABLE
+        )
+
+        UTIL.print_end_title(f"Gripper [DXL ID:{dxl_id}] Enable is Done")
+        return True
+    
+    
     
     def homing(self, dxl_id=None, iter=100) -> bool:
         """

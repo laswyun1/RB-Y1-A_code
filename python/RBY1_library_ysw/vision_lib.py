@@ -544,8 +544,10 @@ def average_detectColorObjectContour3D(samples):
     return result
 
 
-
-def convertPos_vision_to_head2(pos_vision):
+    
+ 
+            
+def convertPos_vision_to_linkhead2(pos_vision):
     """
     This function converts 3D position value from vision camera frame to "link_head_2" frame
     
@@ -566,5 +568,92 @@ def convertPos_vision_to_head2(pos_vision):
     Z = -pos_y + RI.D435I_Z_OFFSET_FROM_LINK_HEAD_2
     
     return np.array([X, Y, Z], dtype=np.float64)
+
+
+
+def calculateEEpos_forGrasp(object_pos_from_vision, object_3Dsize):
+    """
+    This function calculates the position of "ee_finger_r1" or "ee_finger_l1" based on "link_head_2"
+    It is only applicable if the end-effector orientation(rpy) is matched with "link_head_2" frame
+        [Ex: Right EE]
+            link_head_2 frame => Rz(+90) -> Rx(-90) => Right EE frame
+            EE frame x = link_head_2 frame y
+            EE frame y = link_head_2 frame -z
+            EE frame z = link_head_2 frame -x
+        [Ex: Left EE]
+            link_head_2 frame => Rx(+90) -> Ry(-90) => Left EE frame
+            EE frame x = link_head_2 frame -y
+            EE frame y = link_head_2 frame z
+            EE frame z = link_head_2 frame -x
+    
+    args:
+        object_pos_from_vision: object's 3D center position obtained by D435i
+        object_3Dsize: object's 3D size (w,h,d)
+    
+    return:
+        object_pos_from_linkhead2_to_ee_before_open_gripper: 3D position of "ee_finger_l1/r1" relative to "link_head_2" before open the gripper
+        object_pos_from_linkhead2_to_ee_after_open_gripper: 3D position of "ee_finger_l1/r1" relative to "link_head_2" after open the gripper (final destination)
+    """
+    object_pos_from_linkhead2 = convertPos_vision_to_linkhead2(object_pos_from_vision)
+    
+    object_maxDim = max(object_3Dsize)
+    
+    # small distanted offset from object's nearest part
+    x_offset = object_maxDim / 2 + RI.GRIPPER_OFFSET_BEFORE_GRASP
+    
+    # "link_head_2" to "ee_finger_l1/r1" position considering finger length
+    object_pos_from_linkhead2_to_ee_before_open_gripper = object_pos_from_linkhead2 + [RI.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER -x_offset , 0, 0]
+    object_pos_from_linkhead2_to_ee_after_open_gripper  = object_pos_from_linkhead2 + [RI.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER , 0, 0]
+    
+    return object_pos_from_linkhead2_to_ee_before_open_gripper, object_pos_from_linkhead2_to_ee_after_open_gripper
+            
+    
+
+def calculateEEpos_forPlace(box_pos_from_vision, box_3Dsize, object_3Dsize, pos, head_y_angle):
+    """
+    This function calculates the position of "ee_finger_r1" or "ee_finger_l1" based on "link_head_2"
+    It is only applicable if the end-effector orientation(rpy) is matched with "link_head_2" frame
+        [Ex: Right EE]
+            link_head_2 frame => Rz(+90) -> Rx(-90) => Right EE frame
+            EE frame x = link_head_2 frame y
+            EE frame y = link_head_2 frame -z
+            EE frame z = link_head_2 frame -x
+        [Ex: Left EE]
+            link_head_2 frame => Rx(+90) -> Ry(-90) => Left EE frame
+            EE frame x = link_head_2 frame -y
+            EE frame y = link_head_2 frame z
+            EE frame z = link_head_2 frame -x
+    
+    args:
+        box_pos_from_vision: box's 3D center position obtained by D435i
+        box_3Dsize: object's 3D size (w,h,d)
+        pos: get_FK(robot, reference_link="link_head_2", target_link="ee_finger_11/r1")["position"]
+        rpy: get_FK(robot, reference_link="link_head_2", target_link="ee_finger_11/r1")["rpy"]
+        
+    return:
+        box_pos_from_linkhead2_to_ee_before_open_gripper: 3D position of "ee_finger_l1/r1" relative to "link_head_2" before open the gripper
+        box_pos_from_linkhead2_to_ee_after_open_gripper: 3D position of "ee_finger_l1/r1" relative to "link_head_2" after open the gripper (final destination)
+    """
+    box_pos_from_linkhead2 = convertPos_vision_to_linkhead2(box_pos_from_vision)
+    
+    box_maxDim = max(box_3Dsize)
+    object_maxDim = max(object_3Dsize)
+    
+    # small distanted offset from object's nearest part
+    z_offset_box = box_maxDim / 2
+    
+    # total distance from ee_finger_l1/r1 frame to object's end
+    pos_from_ee_finger_to_object = np.array([0, 0, RI.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER - object_maxDim])
     
     
+    
+    
+    
+    
+    z_offset_ee = RI.GRIPPER_OFFSET_BEFORE_GRASP
+    
+    # "link_head_2" to "ee_finger_l1/r1" position considering finger length
+    object_pos_from_linkhead2_to_ee_before_open_gripper = object_pos_from_linkhead2 + [RI.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER -x_offset , 0, 0]
+    object_pos_from_linkhead2_to_ee_after_open_gripper  = object_pos_from_linkhead2 + [RI.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER , 0, 0]
+    
+    return object_pos_from_linkhead2_to_ee_before_open_gripper, object_pos_from_linkhead2_to_ee_after_open_gripper  

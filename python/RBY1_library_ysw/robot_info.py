@@ -234,10 +234,10 @@ GRIPPER_DEBUG_POS = {"torso":     np.deg2rad([0.0, 80.0, -140.0,   60.0, 0.0,   
                      "left_arm":  np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0, -20.0, 0.0]),
                      "head":      np.deg2rad([0.0, 0.0])}
 
-DEMO_POS =  {"torso":     np.deg2rad([0.0, 30.0, -60.0,   30.0, 0.0,  0.0]),
-             "right_arm": np.deg2rad([0.0, -23.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
-             "left_arm":  np.deg2rad([0.0,  23.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
-             "head":      np.deg2rad([0.0, 45.0])}
+DEMO_POS = {"torso":     np.deg2rad([0.0, 30.0, -60.0,   30.0, 0.0,  0.0]),
+            "right_arm": np.deg2rad([0.0, -23.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
+            "left_arm":  np.deg2rad([0.0,  23.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
+            "head":      np.deg2rad([0.0, 55.0])}
 
 
 
@@ -386,8 +386,10 @@ DEMO_LAY_CURRENT_L              = -0.03
 DEMO_ZEROING_CURRENT_L          = 0.03
 DEMO_LAY_CURRENT_END            = 0.0
 
-GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER = -0.03
-
+GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER = -0.045       # Unit=[m], Fingertip offset from "link_ee_finger_r1" or "link_ee_finger_l1" frames 
+GRIPPER_OFFSET_BEFORE_GRASP          = 0.03         # Unit=[m], Offset before gripper grasp (or open) | It should be applied after applying "max(3D_size(object)/2)" offset
+GRIPPER_SAFETY_OPEN_OFFSET           = 10.0         # Unit=[mm], Safety margin for position control of gripper (open)
+GRIPPER_SAFETY_CLOSE_OFFSET          = -1.2*GRIPPER_SAFETY_OPEN_OFFSET        # Unit=[mm], for position control of gripper (close)
 
 
 # =============================================================================
@@ -407,7 +409,7 @@ HSV_MASK_SILVER = [(np.array([0, 0, 80]), np.array([180, 60, 255]))]
 # =============================================================================
 # D435i Parameters
 # =============================================================================
-D435I_Z_OFFSET_FROM_LINK_HEAD_2 = 0.065
+D435I_Z_OFFSET_FROM_LINK_HEAD_2 = 0.07      # Unit=[m]
 
 
 
