@@ -351,9 +351,21 @@ class D435i:
 
     
     
-    def detectColorObjectContour3D(self, color_image, depth_frame, mask_list, minimum_area):
+    def detectColorObjectContour3D(self, color_image, depth_frame, mask_list, minimum_area, maximum_depth=None, sampling: int=3):
         """
         Detect colored objects using contour and calculate 3D bounding box.
+        
+        args:
+            color_image
+            depth_frame
+            mask_list
+            minimum_area
+            maximum_depth:
+                If not None, points with depth >= maximum_depth are ignored.(Ex. floor) 
+                unit: [m]c=
+            sampling:
+                how many sample steps skip for reducing calculation load
+                [Ex] If sampling=3, 1st sample, 4th sample, 7th sample... are used
 
         return:
             detected_objects
@@ -402,7 +414,7 @@ class D435i:
             points_3d = []
 
             # Sampling for fast calculation
-            sample_step = 3
+            sample_step = sampling
 
             for u, v in zip(xs[::sample_step], ys[::sample_step]):
                 if u < 0 or u >= width or v < 0 or v >= height:
@@ -426,11 +438,15 @@ class D435i:
 
             # 3D center position (Median -> recommended)
             center_3d_median = np.median(points_3d, axis=0)
+            
+            # object 중심 depth가 maximum_depth 이상이면 object 자체를 무시(Ex. floor)
+            if maximum_depth is not None and center_3d_median[2] >= maximum_depth:
+                continue
+
 
             # Axis-aligned 3D bounding box
             min_3d = np.min(points_3d, axis=0)
             max_3d = np.max(points_3d, axis=0)
-
             size_3d = max_3d - min_3d
 
             Xc, Yc, Zc = center_3d_median
@@ -491,7 +507,6 @@ class D435i:
         )
 
         return detected_objects, color_image, mask_total
-    
     
     
     
@@ -564,16 +579,16 @@ def convertPos_vision_to_linkhead2(pos_vision):
     pos_z = pos_vision[2]
     
     X = pos_z
-    Y = -pos_x
+    Y = -pos_x + RI.D435I_X_OFFSET_FROM_D435I_CENTER
     Z = -pos_y + RI.D435I_Z_OFFSET_FROM_LINK_HEAD_2
     
     return np.array([X, Y, Z], dtype=np.float64)
 
 
 
-def calculateEEpos_forGrasp(object_pos_from_vision, object_3Dsize):
+def calculateEEpos_forGrasp(object_pos_from_vision, object_3Dsize, manual_offset: float=0):
     """
-    This function calculates the position of "ee_finger_r1" or "ee_finger_l1" based on "link_head_2"
+    This function calculates the position of final end-effector(NOT "ee_finger_r1" or "ee_finger_l1") based on "link_head_2"
     It is only applicable if the end-effector orientation(rpy) is matched with "link_head_2" frame
         [Ex: Right EE]
             link_head_2 frame => Rz(+90) -> Rx(-90) => Right EE frame
@@ -589,10 +604,18 @@ def calculateEEpos_forGrasp(object_pos_from_vision, object_3Dsize):
     args:
         object_pos_from_vision: object's 3D center position obtained by D435i
         object_3Dsize: object's 3D size (w,h,d)
+        manual_offset: 
+            Manual offset for fine tuning(theoretically it should be zero)
+            For pick&place demo, I use 0.03m 
+            direction: same as proceeding direction of arm or end-effector
+            (+): go forward slightly more to proceeding direction
+            (-): backward
     
     return:
-        object_pos_from_linkhead2_to_ee_before_open_gripper: 3D position of "ee_finger_l1/r1" relative to "link_head_2" before open the gripper
-        object_pos_from_linkhead2_to_ee_after_open_gripper: 3D position of "ee_finger_l1/r1" relative to "link_head_2" after open the gripper (final destination)
+        object_pos_from_linkhead2_to_ee_before_open_gripper: 
+            3D position of end-effector(Not "ee_finger_l1/r1") relative to "link_head_2" before open the gripper
+        object_pos_from_linkhead2_to_ee_after_open_gripper: 
+            3D position of end-effector(Not "ee_finger_l1/r1") relative to "link_head_2" after open the gripper (final destination)
     """
     object_pos_from_linkhead2 = convertPos_vision_to_linkhead2(object_pos_from_vision)
     
@@ -602,8 +625,8 @@ def calculateEEpos_forGrasp(object_pos_from_vision, object_3Dsize):
     x_offset = object_maxDim / 2 + RI.GRIPPER_OFFSET_BEFORE_GRASP
     
     # "link_head_2" to "ee_finger_l1/r1" position considering finger length
-    object_pos_from_linkhead2_to_ee_before_open_gripper = object_pos_from_linkhead2 + [RI.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER -x_offset , 0, 0]
-    object_pos_from_linkhead2_to_ee_after_open_gripper  = object_pos_from_linkhead2 + [RI.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER , 0, 0]
+    object_pos_from_linkhead2_to_ee_before_open_gripper = object_pos_from_linkhead2 + [-x_offset , 0, 0]
+    object_pos_from_linkhead2_to_ee_after_open_gripper  = object_pos_from_linkhead2 + [+manual_offset, 0, 0]
     
     return object_pos_from_linkhead2_to_ee_before_open_gripper, object_pos_from_linkhead2_to_ee_after_open_gripper
             

@@ -235,11 +235,29 @@ GRIPPER_DEBUG_POS = {"torso":     np.deg2rad([0.0, 80.0, -140.0,   60.0, 0.0,   
                      "head":      np.deg2rad([0.0, 0.0])}
 
 DEMO_POS = {"torso":     np.deg2rad([0.0, 30.0, -60.0,   30.0, 0.0,  0.0]),
-            "right_arm": np.deg2rad([0.0, -23.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
-            "left_arm":  np.deg2rad([0.0,  23.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
+            "right_arm": np.deg2rad([0.0, -30.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
+            "left_arm":  np.deg2rad([0.0,  30.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
             "head":      np.deg2rad([0.0, 55.0])}
 
+DEMO1_POS = {"torso":     np.deg2rad([0.0, 30.0, -60.0,  30.0, 0.0,  0.0]),
+            "right_arm": np.deg2rad([0.0, -5.0,   0.0, -140.0, 0.0, 100.0, 0.0]),
+            "left_arm":  np.deg2rad([0.0,  5.0,   0.0, -140.0, 0.0, 100.0, 0.0]),
+            "head":      np.deg2rad([0.0, 0.0])}
 
+DEMO2_POS = {"torso":     np.deg2rad([0.0, 20.0, -40.0,  20.0, 0.0,  90.0]),
+            "right_arm": np.deg2rad([0.0, -5.0,   0.0, -140.0, 0.0, 100.0, 0.0]),
+            "left_arm":  np.deg2rad([0.0,  5.0,   0.0, -140.0, 0.0, 100.0, 0.0]),
+            "head":      np.deg2rad([0.0, 0.0])}
+
+DEMO3_POS = {"torso":     np.deg2rad([0.0, 20.0, -40.0,  20.0, 0.0,  90.0]),
+            "right_arm": np.deg2rad([0.0, -5.0,   0.0, -140.0, 0.0, 100.0, 0.0]),
+            "left_arm":  np.deg2rad([0.0,  5.0,   0.0, -140.0, 0.0, 100.0, 0.0]),
+            "head":      np.deg2rad([0.0, 0.0])}
+
+DEMO4_POS = {"torso":    np.deg2rad([0.0, 30.0, -60.0,  30.0, 0.0,  90.0]),
+            "right_arm": [-0.0601, -0.1998, 0.2327, -1.7624, -1.8268, 1.2227, -0.0],
+            "left_arm":  [-0.1906, 0.5334, -0.1544, -1.5765, 2.1171, 1.4631, 0.0011],
+            "head":      np.deg2rad([0.0, 0.0])}
 
 # =============================================================================
 # 2-DoF Joint Position for (Head) Postures [0: Yaw, 1: Pitch]
@@ -386,7 +404,7 @@ DEMO_LAY_CURRENT_L              = -0.03
 DEMO_ZEROING_CURRENT_L          = 0.03
 DEMO_LAY_CURRENT_END            = 0.0
 
-GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER = -0.045       # Unit=[m], Fingertip offset from "link_ee_finger_r1" or "link_ee_finger_l1" frames 
+GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER = -0.0605      # Unit=[m], Fingertip offset from "link_ee_finger_r1" or "link_ee_finger_l1" frames (using EE_FINGER.dae)
 GRIPPER_OFFSET_BEFORE_GRASP          = 0.03         # Unit=[m], Offset before gripper grasp (or open) | It should be applied after applying "max(3D_size(object)/2)" offset
 GRIPPER_SAFETY_OPEN_OFFSET           = 10.0         # Unit=[mm], Safety margin for position control of gripper (open)
 GRIPPER_SAFETY_CLOSE_OFFSET          = -1.2*GRIPPER_SAFETY_OPEN_OFFSET        # Unit=[mm], for position control of gripper (close)
@@ -399,9 +417,8 @@ GRIPPER_SAFETY_CLOSE_OFFSET          = -1.2*GRIPPER_SAFETY_OPEN_OFFSET        # 
 
 HSV_MASK_RED    = [(np.array([0, 80, 80]), np.array([10, 255, 255])),
                    (np.array([170, 80, 80]), np.array([180, 255, 255]))]
-
-HSV_MASK_BLACK  = [(np.array([0, 0, 0]), np.array([179, 255, 30]))]
-
+# HSV_MASK_BLACK  = [(np.array([0, 0, 0]), np.array([179, 255, 30]))]       # Strict
+HSV_MASK_BLACK  = [(np.array([0, 0, 0]), np.array([179, 255, 60]))]         # Not strict
 HSV_MASK_SILVER = [(np.array([0, 0, 80]), np.array([180, 60, 255]))]
 
 
@@ -409,7 +426,11 @@ HSV_MASK_SILVER = [(np.array([0, 0, 80]), np.array([180, 60, 255]))]
 # =============================================================================
 # D435i Parameters
 # =============================================================================
-D435I_Z_OFFSET_FROM_LINK_HEAD_2 = 0.07      # Unit=[m]
+
+# Should be strictly measured!!!
+D435I_Z_OFFSET_FROM_LINK_HEAD_2      = 0.07      # Unit=[m]
+D435I_X_OFFSET_FROM_D435I_CENTER     = 0.0225    # Unit=[m], Origin standard: Left image camera | offset of D435i hardware center from measure frame
+D435I_DEPTH_Z_OFFSET_FROM_LENS_PLANE = -0.01     # Unit=[m], Reference=Lens plane | Depth(z) standard point position offset relative to D435i lens plane
 
 
 
