@@ -797,6 +797,12 @@ def positionCtrl_cartesian_wholeBody(
                 "right_arm_1": -np.pi / 3,
                 "left_arm_1": np.pi / 3,
             }
+            
+        get_return:
+            True:  wait for return due to ".get()" 
+            False: No waiting
+            If "get_return" is True and the targets are not within the precision,
+            the function is not terminating -> In this case, use [False]
     """
     UTIL.print_start_title("Cartesian Position Control(Whole-Body) Starts")
     

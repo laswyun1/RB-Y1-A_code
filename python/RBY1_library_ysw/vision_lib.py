@@ -362,7 +362,7 @@ class D435i:
             minimum_area
             maximum_depth:
                 If not None, points with depth >= maximum_depth are ignored.(Ex. floor) 
-                unit: [m]c=
+                unit: [m]
             sampling:
                 how many sample steps skip for reducing calculation load
                 [Ex] If sampling=3, 1st sample, 4th sample, 7th sample... are used
@@ -586,7 +586,7 @@ def convertPos_vision_to_linkhead2(pos_vision):
 
 
 
-def calculateEEpos_forGrasp(object_pos_from_vision, object_3Dsize, manual_offset: float=0):
+def calculateEEpos_forGrasp(object_pos_from_vision, object_3Dsize, object_offset_use=True, manual_offset: float=0.0):
     """
     This function calculates the position of final end-effector(NOT "ee_finger_r1" or "ee_finger_l1") based on "link_head_2"
     It is only applicable if the end-effector orientation(rpy) is matched with "link_head_2" frame
@@ -604,6 +604,8 @@ def calculateEEpos_forGrasp(object_pos_from_vision, object_3Dsize, manual_offset
     args:
         object_pos_from_vision: object's 3D center position obtained by D435i
         object_3Dsize: object's 3D size (w,h,d)
+        object_offset_use:
+            If it is True, apply the offset of max(3D_size)/2 to avoid contact before open the gripper
         manual_offset: 
             Manual offset for fine tuning(theoretically it should be zero)
             For pick&place demo, I use 0.03m 
@@ -622,7 +624,10 @@ def calculateEEpos_forGrasp(object_pos_from_vision, object_3Dsize, manual_offset
     object_maxDim = max(object_3Dsize)
     
     # small distanted offset from object's nearest part
-    x_offset = object_maxDim / 2 + RI.GRIPPER_OFFSET_BEFORE_GRASP
+    if (object_offset_use):
+        x_offset = object_maxDim / 2 + RI.GRIPPER_OFFSET_BEFORE_GRASP
+    else:
+        x_offset = RI.GRIPPER_OFFSET_BEFORE_GRASP
     
     # "link_head_2" to "ee_finger_l1/r1" position considering finger length
     object_pos_from_linkhead2_to_ee_before_open_gripper = object_pos_from_linkhead2 + [-x_offset , 0, 0]
@@ -680,3 +685,5 @@ def calculateEEpos_forPlace(box_pos_from_vision, box_3Dsize, object_3Dsize, pos,
     object_pos_from_linkhead2_to_ee_after_open_gripper  = object_pos_from_linkhead2 + [RI.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER , 0, 0]
     
     return object_pos_from_linkhead2_to_ee_before_open_gripper, object_pos_from_linkhead2_to_ee_after_open_gripper  
+
+
