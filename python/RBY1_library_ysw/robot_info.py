@@ -256,7 +256,7 @@ DEMO_AFTER_GRASP_POS_260723 = {"torso":     np.deg2rad([0.0,   0.0,  0.0,    0.0
 DEMO_VISION_BASIC_POS_260723 = {"torso":     np.deg2rad([0.0, 30.0, -60.0,   30.0, 0.0,  0.0]),
                                 "right_arm": np.deg2rad([0.0, -30.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
                                 "left_arm":  np.deg2rad([0.0,  30.0,   0.0, -120.0, 0.0, 70.0, 0.0]),
-                                "head":      np.deg2rad([0.0, 55.0])}
+                                "head":      np.deg2rad([0.0, 40.0])}
 
 # 왼손에 집은 물체를 오른손으로 옮기는 자세 (manual, 이 자세 전에 오른손 그리퍼가 열려있어야 함)
 DEMO_RIGHT_TO_LEFT_POS_260723 = {"torso":    np.deg2rad([0.0, 30.0, -60.0,  30.0, 0.0,  0.0]),
@@ -429,7 +429,7 @@ HSV_MASK_RED    = [(np.array([0, 80, 80]), np.array([10, 255, 255])),
 # HSV_MASK_BLACK  = [(np.array([0, 0, 0]), np.array([179, 255, 30]))]       # Strict
 HSV_MASK_BLACK  = [(np.array([0, 0, 0]), np.array([179, 255, 60]))]         # Not strict
 HSV_MASK_SILVER = [(np.array([0, 0, 80]), np.array([180, 60, 255]))]
-
+HSV_MASK_YELLOW = [(np.array([15, 40, 40]), np.array([45, 255, 255]))]
 
 
 # =============================================================================
