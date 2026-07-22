@@ -61,12 +61,11 @@ logging.basicConfig(
 # ==========================================================================================================
 # Tuning Parameters
 # ==========================================================================================================
-position_control_minimum_time = 5.5      # [sec]
-minimum_time_scaler = 0.5                # For short movement
+position_control_minimum_time = 3.5      # [sec]
 grasp_current = 0.2     # [A]
 object_floating_x_in_linktorso5 = -0.05   # [m]
 object_floating_z_in_linktorso5 = 0.05    # [m]
-vision_record_duration = 2.0    # [sec]
+vision_record_duration = 3.0    # [sec]
 
 trial_num = 4       # How many times to do -> It can be regarded as the object numbers to "pick & place"          
 
@@ -129,7 +128,7 @@ while (trial_idx < trial_num):
     # Turn to Left Shelf
     # ======================================================================================================
     desired_pos = ysw.DEMO_TURN_POS_260723    
-    ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time, control_hold_time=0.5)
+    ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time, control_hold_time=1.0)
 
 
     # ======================================================================================================
@@ -251,7 +250,7 @@ while (trial_idx < trial_num):
     # {C}: ee_finger_l1/r1 frame
     # {D}: final fingertip frame -> same orientation of {C}
 
-    manual_offset = 0.05  # [m] for forward x-direction relative to "link_torso_5"
+    manual_offset = 0.045  # [m] for forward x-direction relative to "link_torso_5"
 
     leftmost_obj_pos    = leftmost_obj_avg_sample["center_3d_avg"]
     leftmost_obj_3Dsize = leftmost_obj_avg_sample["bbox_3d_size_avg"]
@@ -459,7 +458,7 @@ while (trial_idx < trial_num):
     # Turn Right to face Table (Initial Posture)
     # ======================================================================================================
     desired_pos = ysw.DEMO_BASIC_POS_260723 
-    ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time, control_hold_time=0.5)
+    ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time, control_hold_time=1.0)
     
     # ======================================================================================================
     # Move both arms apart slightly to ensure the Vision range 
@@ -701,7 +700,7 @@ while (trial_idx < trial_num):
                                                 {
                                                     "reference_link": "link_torso_5",
                                                     "target_link": "ee_finger_r1",
-                                                    "pos": pos_box + np.array([0.0, 0.0, (np.mean(box_3Dsize)/1.5)]),
+                                                    "pos": pos_box + np.array([0.01, 0.0, (np.mean(box_3Dsize)/2.0)]),
                                                     "rpy": ori_box                    
                                                 },                 
                                             ]
@@ -778,7 +777,7 @@ while (trial_idx < trial_num):
                                                 {
                                                     "reference_link": "link_torso_5",
                                                     "target_link": "ee_finger_l1",
-                                                    "pos": pos_box + np.array([0.0, 0.0, (np.mean(box_3Dsize)/1.5)]),
+                                                    "pos": pos_box + np.array([0.01, 0.0, (np.mean(box_3Dsize)/2.0)]),
                                                     "rpy": ori_box                    
                                                 },                 
                                             ]
@@ -848,11 +847,14 @@ while (trial_idx < trial_num):
     
     
     # ======================================================================================================
-    # Counting the trial number
+    # Counting the trial number and Go to Reset Posture
     # ======================================================================================================
     trial_idx = trial_idx + 1
     
     if (trial_idx == trial_num):
         desired_pos = ysw.DEMO_VISION_BASIC_POS_260723   
-    ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time, control_hold_time=0.5)    
+        ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time*0.8, control_hold_time=0.5)  
+    else:
+        desired_pos = ysw.DEMO_BASIC_POS_260723   
+        ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time*0.8, control_hold_time=0.5)
     
