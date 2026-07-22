@@ -77,6 +77,7 @@ def initialize(mode: str, address: str, model: str, power: str=".*", servo: str=
             logging.error("Failed to connect to the Robot")
             return None
         logging.info("SUCCESS: Connected to the Robot!")
+        time.sleep(0.1)
     
     if (option == RI.CONNECT_AND_POWER):
         # 3.Power ON
@@ -85,6 +86,7 @@ def initialize(mode: str, address: str, model: str, power: str=".*", servo: str=
                 logging.error("Failed to Power ON")
                 return None
         logging.info("SUCCESS: Power ON the Robot!")
+        time.sleep(0.1)
 
         # 4.Servo ON
         if not robot.is_servo_on(servo):                            # Servo Check
@@ -92,6 +94,7 @@ def initialize(mode: str, address: str, model: str, power: str=".*", servo: str=
                 logging.error("Failed to Servo ON")
                 return None
         logging.info("SUCCESS: Servo ON the Robot!")
+        time.sleep(0.1)
     
         # 5.Reset Control Manager
         if robot.get_control_manager_state().state in [             # CM Check
@@ -105,14 +108,16 @@ def initialize(mode: str, address: str, model: str, power: str=".*", servo: str=
             if not robot.enable_control_manager(unlimited_mode_enabled=True):       # Essential for Reinitialize from Fault
                 logging.error("Failed to Unlimit the Control Manager after Fault")
                 return None
-
-        logging.info("SUCCESS: Reset the Control Manager!")
+    
+            logging.info("SUCCESS: Reset the Control Manager!")
+            time.sleep(0.1)
     
         # 6.Enable Control Manager
         if not robot.enable_control_manager():                      # CM Enable
             logging.error("Failed to Enable the Control Manager")
             return None
         logging.info("SUCCESS: Enable the Control Manager!")
+        time.sleep(0.1)
         
         # 7.Enable Grippers (Only for UPC mode)
         if mode == RI.MODE_DIRECT_UPC:
@@ -123,6 +128,7 @@ def initialize(mode: str, address: str, model: str, power: str=".*", servo: str=
                 logging.error("Failed to Enable the Left Gripper")
                 return None
             logging.info("SUCCESS: Enable the Grippers!")
+            time.sleep(0.1)
         
     UTIL.print_end_title("Intialization is Done")
     return robot

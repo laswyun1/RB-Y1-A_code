@@ -351,7 +351,16 @@ class D435i:
 
     
     
-    def detectColorObjectContour3D(self, color_image, depth_frame, mask_list, minimum_area, maximum_depth=None, sampling: int=3):
+    def detectColorObjectContour3D(
+        self, 
+        color_image, 
+        depth_frame, 
+        mask_list, 
+        minimum_area, 
+        maximum_depth=None,
+        pixel_roi_x=None,   # [x_min, x_max] or None
+        pixel_roi_y=None,   # [y_min, y_max] or None
+        sampling: int=3):
         """
         Detect colored objects using contour and calculate 3D bounding box.
         
@@ -363,6 +372,11 @@ class D435i:
             maximum_depth:
                 If not None, points with depth >= maximum_depth are ignored.(Ex. floor) 
                 unit: [m]
+            pixel_roi_x/y:
+                If you want to check only in specific pixel region, use this arguments
+                [Ex] pixel_roi_x = [x_min, x_max] 
+                     pixel_roi_y = [y_min, y_max]
+                     If it is set as None, whole pixel region will be used
             sampling:
                 how many sample steps skip for reducing calculation load
                 [Ex] If sampling=3, 1st sample, 4th sample, 7th sample... are used
@@ -383,6 +397,36 @@ class D435i:
             upper = np.array(upper, dtype=np.uint8)
             mask = cv2.inRange(hsv, lower, upper)
             mask_total = cv2.bitwise_or(mask_total, mask)   # Append
+            
+        # 특정 pixel ROI 안에서만 검출
+        # pixel_roi_x=None이면 x 전체 사용
+        # pixel_roi_y=None이면 y 전체 사용
+        # Pixel Origin: (0,0) = 왼쪽 위 꼭짓점 (x: left-to-right, y: top-to-bottom)
+        if pixel_roi_x is not None or pixel_roi_y is not None:
+            height, width = mask_total.shape
+
+            # x range
+            if pixel_roi_x is None:
+                x_min = 0
+                x_max = width
+            else:
+                x_min, x_max = pixel_roi_x
+                x_min = int(np.clip(x_min, 0, width - 1))
+                x_max = int(np.clip(x_max, 0, width))
+
+            # y range
+            if pixel_roi_y is None:
+                y_min = 0
+                y_max = height
+            else:
+                y_min, y_max = pixel_roi_y
+                y_min = int(np.clip(y_min, 0, height - 1))
+                y_max = int(np.clip(y_max, 0, height))
+
+            roi_mask = np.zeros_like(mask_total, dtype=np.uint8)
+            roi_mask[y_min:y_max, x_min:x_max] = 255
+
+            mask_total = cv2.bitwise_and(mask_total, roi_mask)
 
         # Remove noise
         kernel = np.ones((5, 5), np.uint8)
@@ -515,7 +559,32 @@ class D435i:
 
 
 
+def crop_image_by_roi(image, pixel_roi_x=None, pixel_roi_y=None):
+    """
+    When use "imshow" to show color image, depth colormap, 
+    If you use specific ROI, then this function will be used to show only that region 
+    """
+    height, width = image.shape[:2]
 
+    # x range
+    if pixel_roi_x is None:
+        x_min = 0
+        x_max = width
+    else:
+        x_min, x_max = pixel_roi_x
+        x_min = int(np.clip(x_min, 0, width - 1))
+        x_max = int(np.clip(x_max, 0, width))
+
+    # y range
+    if pixel_roi_y is None:
+        y_min = 0
+        y_max = height
+    else:
+        y_min, y_max = pixel_roi_y
+        y_min = int(np.clip(y_min, 0, height - 1))
+        y_max = int(np.clip(y_max, 0, height))
+
+    return image[y_min:y_max, x_min:x_max]
 
 
 
