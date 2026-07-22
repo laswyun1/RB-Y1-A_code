@@ -61,7 +61,7 @@ logging.basicConfig(
 # ==========================================================================================================
 # Tuning Parameters
 # ==========================================================================================================
-position_control_minimum_time = 3.5      # [sec]
+position_control_minimum_time = 2.0      # [sec]
 grasp_current = 0.2     # [A]
 object_floating_x_in_linktorso5 = -0.05   # [m]
 object_floating_z_in_linktorso5 = 0.05    # [m]
@@ -128,7 +128,7 @@ while (trial_idx < trial_num):
     # Turn to Left Shelf
     # ======================================================================================================
     desired_pos = ysw.DEMO_TURN_POS_260723    
-    ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time, control_hold_time=1.0)
+    ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time*1.1, control_hold_time=0.5)
 
 
     # ======================================================================================================
@@ -458,7 +458,7 @@ while (trial_idx < trial_num):
     # Turn Right to face Table (Initial Posture)
     # ======================================================================================================
     desired_pos = ysw.DEMO_BASIC_POS_260723 
-    ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time, control_hold_time=1.0)
+    ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time*1.1, control_hold_time=0.5)
     
     # ======================================================================================================
     # Move both arms apart slightly to ensure the Vision range 
