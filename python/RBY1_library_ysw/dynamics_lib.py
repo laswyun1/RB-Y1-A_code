@@ -448,7 +448,8 @@ def positionCtrl_joint_22dof(robot, posture, minimum_time=5.0, control_hold_time
         rv = robot.send_command(rc).get()
         
         if rv.finish_code != rby.RobotCommandFeedback.FinishCode.Ok:
-            logging.error("Failed to conduct [move_position_22dof].")
+            logging.error(f"Failed to conduct [move_position_22dof]."
+                          f"finish_code = {rv.finish_code}")
             return False
         UTIL.print_end_title("22-DoF Joint Position Control Ends")
         return True

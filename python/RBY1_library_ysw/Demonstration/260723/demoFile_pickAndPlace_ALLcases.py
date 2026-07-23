@@ -65,9 +65,9 @@ position_control_minimum_time = 2.0      # [sec]
 grasp_current = 0.2     # [A]
 object_floating_x_in_linktorso5 = -0.05   # [m]
 object_floating_z_in_linktorso5 = 0.05    # [m]
-vision_record_duration = 3.0    # [sec]
+vision_record_duration = 5.0    # [sec]
 
-trial_num = 4       # How many times to do -> It can be regarded as the object numbers to "pick & place"          
+trial_num = 6       # How many times to do -> It can be regarded as the object numbers to "pick & place"          
 
 
 # ==========================================================================================================
@@ -123,7 +123,8 @@ ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_m
 # ==========================================================================================================
 trial_idx = 0
 
-while (trial_idx < trial_num):
+# while (trial_idx < trial_num):
+while True:
     # ======================================================================================================
     # Turn to Left Shelf
     # ======================================================================================================
@@ -374,7 +375,7 @@ while (trial_idx < trial_num):
                                                 {
                                                     "reference_link": "link_torso_5",
                                                     "target_link": "ee_finger_r1",
-                                                    "pos": pos_after_open_gripper,                  
+                                                    "pos": pos_after_open_gripper + np.array([-0.02, 0.0, 0.0]),                  
                                                     "rpy": ori_after_open_gripper,                    
                                                 },                 
                                             ]
@@ -384,7 +385,7 @@ while (trial_idx < trial_num):
                                                 {
                                                     "reference_link": "link_torso_5",
                                                     "target_link": "ee_finger_l1",
-                                                    "pos": pos_after_open_gripper,                  
+                                                    "pos": pos_after_open_gripper + np.array([-0.01, 0.0, 0.0]),                  
                                                     "rpy": ori_after_open_gripper,                    
                                                 },                 
                                             ]
@@ -453,7 +454,7 @@ while (trial_idx < trial_num):
     # ======================================================================================================
     desired_pos = ysw.DEMO_AFTER_GRASP_POS_260723 
     ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time*0.5, control_hold_time=0.5)
-    
+
     # ======================================================================================================
     # Turn Right to face Table (Initial Posture)
     # ======================================================================================================
@@ -465,7 +466,7 @@ while (trial_idx < trial_num):
     # ======================================================================================================
     desired_pos = ysw.DEMO_VISION_BASIC_POS_260723 
     ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time*0.3, control_hold_time=0.5)
-    
+
     
     # ======================================================================================================
     # Detection of Yellow Collecting Box during "vision_record_duration" seconds
