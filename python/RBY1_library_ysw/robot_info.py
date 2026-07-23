@@ -447,7 +447,8 @@ HSV_MASK_RED    = [(np.array([0, 80, 80]), np.array([10, 255, 255])),
 # HSV_MASK_BLACK  = [(np.array([0, 0, 0]), np.array([179, 255, 30]))]       # Strict
 HSV_MASK_BLACK  = [(np.array([0, 0, 0]), np.array([179, 255, 60]))]         # Not strict
 HSV_MASK_SILVER = [(np.array([0, 0, 80]), np.array([180, 60, 255]))]
-HSV_MASK_YELLOW = [(np.array([15, 40, 40]), np.array([45, 255, 255]))]
+# HSV_MASK_YELLOW = [(np.array([15, 40, 40]), np.array([45, 255, 255]))]
+HSV_MASK_YELLOW = [(np.array([10, 100, 80]), np.array([35, 255, 255]))]
 
 
 # =============================================================================
