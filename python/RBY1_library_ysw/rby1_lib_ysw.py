@@ -6,6 +6,7 @@
 from robot_info import *
 from default_lib import *
 from dynamics_lib import *
+from mobile_lib import *
 from gripper_lib import *
 from vision_lib import *
 from utils import *
