@@ -43,14 +43,33 @@ import pyrealsense2 as rs
 # =============================================================================
 # Code
 # =============================================================================
-class D435i:
-    def __init__(self, rgb_on: bool=True, depth_on: bool=True, pixel: tuple=(640, 480), fps: int=30):
+def serial_check(serial_number):
+    if serial_number is None:
+        return None
+
+    if serial_number == RI.HEAD_D435I_SERIAL:
+        return "Head D435i"
+    elif serial_number == RI.RIGHT_D405_SERIAL:
+        return "Right Wrist D405"
+    elif serial_number == RI.LEFT_D405_SERIAL:
+        return "Left Wrist D405"
+
+    return f"RealSense-{serial_number}"
+            
+
+# =============================================================================
+# D435i and D405 Class
+# =============================================================================
+class RealSenseDepthCamera:
+    def __init__(self, rgb_on: bool=True, depth_on: bool=True, pixel: tuple=(640, 480), fps: int=30, serial_number=None):
         self.rgb_on = rgb_on
         self.depth_on = depth_on
         self.pixel = pixel
         self.fps = fps
+        self.serial_number = serial_number
         
-        self.pipeline = rs.pipeline()
+        self.name = None            # Ex: Head D435i / Right Wrist D405 / Left Wrist D405
+        self.pipeline = None
         self.config = None
         self.align = None
         self.profile = None   
@@ -60,7 +79,12 @@ class D435i:
     
     
     def initialize(self, align_enable=True):
+        self.pipeline = rs.pipeline()
         self.config = rs.config()
+        
+        if self.serial_number is not None:
+            self.config.enable_device(self.serial_number)
+            self.name = serial_check(self.serial_number)
         
         if (self.rgb_on):
             self.config.enable_stream(rs.stream.color, self.pixel[0], self.pixel[1], rs.format.bgr8, self.fps)
@@ -74,18 +98,19 @@ class D435i:
         try:
             self.profile = self.pipeline.start(self.config)
             self.is_started = True
-            logging.info("D435i pipeline started")
+            logging.info(f"[{self.name}] Pipeline started.")
             return True
         
         except RuntimeError as e:
-            logging.error(f"Failed to start D435i pipeline: {e}")
             self.is_started = False
+            logging.error(f"[{self.name}] Failed to start Pipeline: {e}")
             return False
         
         
     def stopPipeline(self):
         if self.is_started:
             self.pipeline.stop()
+            logging.info(f"[{self.name}] Pipeline stopped.")
             self.is_started = False
     
     
@@ -273,11 +298,11 @@ class D435i:
             
         # Remove noise
         kernel = np.ones((5,5), np.uint8)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)   # remove outside small white noise
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)  # remove inside small black noise
+        mask_total = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)   # remove outside small white noise
+        mask_total = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)  # remove inside small black noise
         
         contours, _ = cv2.findContours(
-            mask,
+            mask_total,
             cv2.RETR_EXTERNAL,          # Only find outmost contour
             cv2.CHAIN_APPROX_SIMPLE     # compress and save contour points 
         )
@@ -554,11 +579,6 @@ class D435i:
     
     
     
-
-
-
-
-
 def crop_image_by_roi(image, pixel_roi_x=None, pixel_roi_y=None):
     """
     When use "imshow" to show color image, depth colormap, 
@@ -628,9 +648,10 @@ def average_detectColorObjectContour3D(samples):
     return result
 
 
+# =============================================================================
+# Function for D435i Head Camera
+# =============================================================================
     
- 
-            
 def convertPos_vision_to_linkhead2(pos_vision):
     """
     This function converts 3D position value from vision camera frame to "link_head_2" frame
@@ -655,104 +676,104 @@ def convertPos_vision_to_linkhead2(pos_vision):
 
 
 
-def calculateEEpos_forGrasp(object_pos_from_vision, object_3Dsize, object_offset_use=True, manual_offset: float=0.0):
-    """
-    This function calculates the position of final end-effector(NOT "ee_finger_r1" or "ee_finger_l1") based on "link_head_2"
-    It is only applicable if the end-effector orientation(rpy) is matched with "link_head_2" frame
-        [Ex: Right EE]
-            link_head_2 frame => Rz(+90) -> Rx(-90) => Right EE frame
-            EE frame x = link_head_2 frame y
-            EE frame y = link_head_2 frame -z
-            EE frame z = link_head_2 frame -x
-        [Ex: Left EE]
-            link_head_2 frame => Rx(+90) -> Ry(-90) => Left EE frame
-            EE frame x = link_head_2 frame -y
-            EE frame y = link_head_2 frame z
-            EE frame z = link_head_2 frame -x
+# def calculateEEpos_forGrasp(object_pos_from_vision, object_3Dsize, object_offset_use=True, manual_offset: float=0.0):
+#     """
+#     This function calculates the position of final end-effector(NOT "ee_finger_r1" or "ee_finger_l1") based on "link_head_2"
+#     It is only applicable if the end-effector orientation(rpy) is matched with "link_head_2" frame
+#         [Ex: Right EE]
+#             link_head_2 frame => Rz(+90) -> Rx(-90) => Right EE frame
+#             EE frame x = link_head_2 frame y
+#             EE frame y = link_head_2 frame -z
+#             EE frame z = link_head_2 frame -x
+#         [Ex: Left EE]
+#             link_head_2 frame => Rx(+90) -> Ry(-90) => Left EE frame
+#             EE frame x = link_head_2 frame -y
+#             EE frame y = link_head_2 frame z
+#             EE frame z = link_head_2 frame -x
     
-    args:
-        object_pos_from_vision: object's 3D center position obtained by D435i
-        object_3Dsize: object's 3D size (w,h,d)
-        object_offset_use:
-            If it is True, apply the offset of max(3D_size)/2 to avoid contact before open the gripper
-        manual_offset: 
-            Manual offset for fine tuning(theoretically it should be zero)
-            For pick&place demo, I use 0.03m 
-            direction: same as proceeding direction of arm or end-effector
-            (+): go forward slightly more to proceeding direction
-            (-): backward
+#     args:
+#         object_pos_from_vision: object's 3D center position obtained by D435i
+#         object_3Dsize: object's 3D size (w,h,d)
+#         object_offset_use:
+#             If it is True, apply the offset of max(3D_size)/2 to avoid contact before open the gripper
+#         manual_offset: 
+#             Manual offset for fine tuning(theoretically it should be zero)
+#             For pick&place demo, I use 0.03m 
+#             direction: same as proceeding direction of arm or end-effector
+#             (+): go forward slightly more to proceeding direction
+#             (-): backward
     
-    return:
-        object_pos_from_linkhead2_to_ee_before_open_gripper: 
-            3D position of end-effector(Not "ee_finger_l1/r1") relative to "link_head_2" before open the gripper
-        object_pos_from_linkhead2_to_ee_after_open_gripper: 
-            3D position of end-effector(Not "ee_finger_l1/r1") relative to "link_head_2" after open the gripper (final destination)
-    """
-    object_pos_from_linkhead2 = convertPos_vision_to_linkhead2(object_pos_from_vision)
+#     return:
+#         object_pos_from_linkhead2_to_ee_before_open_gripper: 
+#             3D position of end-effector(Not "ee_finger_l1/r1") relative to "link_head_2" before open the gripper
+#         object_pos_from_linkhead2_to_ee_after_open_gripper: 
+#             3D position of end-effector(Not "ee_finger_l1/r1") relative to "link_head_2" after open the gripper (final destination)
+#     """
+#     object_pos_from_linkhead2 = convertPos_vision_to_linkhead2(object_pos_from_vision)
     
-    object_maxDim = max(object_3Dsize)
+#     object_maxDim = max(object_3Dsize)
     
-    # small distanted offset from object's nearest part
-    if (object_offset_use):
-        x_offset = object_maxDim / 2 + RI.GRIPPER_OFFSET_BEFORE_GRASP
-    else:
-        x_offset = RI.GRIPPER_OFFSET_BEFORE_GRASP
+#     # small distanted offset from object's nearest part
+#     if (object_offset_use):
+#         x_offset = object_maxDim / 2 + RI.GRIPPER_OFFSET_BEFORE_GRASP
+#     else:
+#         x_offset = RI.GRIPPER_OFFSET_BEFORE_GRASP
     
-    # "link_head_2" to "ee_finger_l1/r1" position considering finger length
-    object_pos_from_linkhead2_to_ee_before_open_gripper = object_pos_from_linkhead2 + [-x_offset , 0, 0]
-    object_pos_from_linkhead2_to_ee_after_open_gripper  = object_pos_from_linkhead2 + [+manual_offset, 0, 0]
+#     # "link_head_2" to "ee_finger_l1/r1" position considering finger length
+#     object_pos_from_linkhead2_to_ee_before_open_gripper = object_pos_from_linkhead2 + [-x_offset , 0, 0]
+#     object_pos_from_linkhead2_to_ee_after_open_gripper  = object_pos_from_linkhead2 + [+manual_offset, 0, 0]
     
-    return object_pos_from_linkhead2_to_ee_before_open_gripper, object_pos_from_linkhead2_to_ee_after_open_gripper
+#     return object_pos_from_linkhead2_to_ee_before_open_gripper, object_pos_from_linkhead2_to_ee_after_open_gripper
             
     
 
-def calculateEEpos_forPlace(box_pos_from_vision, box_3Dsize, object_3Dsize, pos, head_y_angle):
-    """
-    This function calculates the position of "ee_finger_r1" or "ee_finger_l1" based on "link_head_2"
-    It is only applicable if the end-effector orientation(rpy) is matched with "link_head_2" frame
-        [Ex: Right EE]
-            link_head_2 frame => Rz(+90) -> Rx(-90) => Right EE frame
-            EE frame x = link_head_2 frame y
-            EE frame y = link_head_2 frame -z
-            EE frame z = link_head_2 frame -x
-        [Ex: Left EE]
-            link_head_2 frame => Rx(+90) -> Ry(-90) => Left EE frame
-            EE frame x = link_head_2 frame -y
-            EE frame y = link_head_2 frame z
-            EE frame z = link_head_2 frame -x
+# def calculateEEpos_forPlace(box_pos_from_vision, box_3Dsize, object_3Dsize, pos, head_y_angle):
+#     """
+#     This function calculates the position of "ee_finger_r1" or "ee_finger_l1" based on "link_head_2"
+#     It is only applicable if the end-effector orientation(rpy) is matched with "link_head_2" frame
+#         [Ex: Right EE]
+#             link_head_2 frame => Rz(+90) -> Rx(-90) => Right EE frame
+#             EE frame x = link_head_2 frame y
+#             EE frame y = link_head_2 frame -z
+#             EE frame z = link_head_2 frame -x
+#         [Ex: Left EE]
+#             link_head_2 frame => Rx(+90) -> Ry(-90) => Left EE frame
+#             EE frame x = link_head_2 frame -y
+#             EE frame y = link_head_2 frame z
+#             EE frame z = link_head_2 frame -x
     
-    args:
-        box_pos_from_vision: box's 3D center position obtained by D435i
-        box_3Dsize: object's 3D size (w,h,d)
-        pos: get_FK(robot, reference_link="link_head_2", target_link="ee_finger_11/r1")["position"]
-        rpy: get_FK(robot, reference_link="link_head_2", target_link="ee_finger_11/r1")["rpy"]
+#     args:
+#         box_pos_from_vision: box's 3D center position obtained by D435i
+#         box_3Dsize: object's 3D size (w,h,d)
+#         pos: get_FK(robot, reference_link="link_head_2", target_link="ee_finger_11/r1")["position"]
+#         rpy: get_FK(robot, reference_link="link_head_2", target_link="ee_finger_11/r1")["rpy"]
         
-    return:
-        box_pos_from_linkhead2_to_ee_before_open_gripper: 3D position of "ee_finger_l1/r1" relative to "link_head_2" before open the gripper
-        box_pos_from_linkhead2_to_ee_after_open_gripper: 3D position of "ee_finger_l1/r1" relative to "link_head_2" after open the gripper (final destination)
-    """
-    box_pos_from_linkhead2 = convertPos_vision_to_linkhead2(box_pos_from_vision)
+#     return:
+#         box_pos_from_linkhead2_to_ee_before_open_gripper: 3D position of "ee_finger_l1/r1" relative to "link_head_2" before open the gripper
+#         box_pos_from_linkhead2_to_ee_after_open_gripper: 3D position of "ee_finger_l1/r1" relative to "link_head_2" after open the gripper (final destination)
+#     """
+#     box_pos_from_linkhead2 = convertPos_vision_to_linkhead2(box_pos_from_vision)
     
-    box_maxDim = max(box_3Dsize)
-    object_maxDim = max(object_3Dsize)
+#     box_maxDim = max(box_3Dsize)
+#     object_maxDim = max(object_3Dsize)
     
-    # small distanted offset from object's nearest part
-    z_offset_box = box_maxDim / 2
+#     # small distanted offset from object's nearest part
+#     z_offset_box = box_maxDim / 2
     
-    # total distance from ee_finger_l1/r1 frame to object's end
-    pos_from_ee_finger_to_object = np.array([0, 0, RI.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER - object_maxDim])
+#     # total distance from ee_finger_l1/r1 frame to object's end
+#     pos_from_ee_finger_to_object = np.array([0, 0, RI.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER - object_maxDim])
     
+#     z_offset_ee = RI.GRIPPER_OFFSET_BEFORE_GRASP
     
+#     # "link_head_2" to "ee_finger_l1/r1" position considering finger length
+#     object_pos_from_linkhead2_to_ee_before_open_gripper = object_pos_from_linkhead2 + [RI.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER -x_offset , 0, 0]
+#     object_pos_from_linkhead2_to_ee_after_open_gripper  = object_pos_from_linkhead2 + [RI.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER , 0, 0]
     
-    
-    
-    
-    z_offset_ee = RI.GRIPPER_OFFSET_BEFORE_GRASP
-    
-    # "link_head_2" to "ee_finger_l1/r1" position considering finger length
-    object_pos_from_linkhead2_to_ee_before_open_gripper = object_pos_from_linkhead2 + [RI.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER -x_offset , 0, 0]
-    object_pos_from_linkhead2_to_ee_after_open_gripper  = object_pos_from_linkhead2 + [RI.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER , 0, 0]
-    
-    return object_pos_from_linkhead2_to_ee_before_open_gripper, object_pos_from_linkhead2_to_ee_after_open_gripper  
+#     return object_pos_from_linkhead2_to_ee_before_open_gripper, object_pos_from_linkhead2_to_ee_after_open_gripper  
 
 
+
+
+# =============================================================================
+# Function for D405 Wrist Camera
+# =============================================================================

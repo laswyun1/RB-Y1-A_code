@@ -435,6 +435,17 @@ GRIPPER_SAFETY_OPEN_OFFSET           = 10.0         # Unit=[mm], Safety margin f
 GRIPPER_SAFETY_CLOSE_OFFSET          = -1.2*GRIPPER_SAFETY_OPEN_OFFSET        # Unit=[mm], for position control of gripper (close)
 
 
+
+# =============================================================================
+# IntelRealsense Depth Camera Info 
+# =============================================================================
+HEAD_D435I_SERIAL = "250122070658"
+RIGHT_D405_SERIAL  = "260322279815"
+LEFT_D405_SERIAL  = "260422275816"
+
+SUPPORT_FRAME_ANGLE = 25        # Unit: [deg], 레인보우로보틱스에서 받은 손목카메라 프레임의 휘어진 각도
+
+
 # =============================================================================
 # Vision Colored Object Detection: HSV mask 
 # (Ex): [([Lower bound 1], [upper bound 1]), ([Lower bound 2], [upper bound 2]), ...]
