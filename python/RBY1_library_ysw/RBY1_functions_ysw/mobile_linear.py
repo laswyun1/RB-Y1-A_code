@@ -29,6 +29,30 @@ robotConfig = ysw.setRobotConfig(ysw.MODE_DIRECT_UPC, ysw.MODEL_A)
 robot = ysw.initialize(robotConfig.mode, robotConfig.address, robotConfig.model, option=ysw.CONNECT_ONLY)
 
 print("[Mobile: Linear move] Starts")
-# ysw.positionCtrl_joint_22dof(robot, ysw.ZERO_POS, minimum_time=5.0, control_hold_time=0.5, get_return=True)
 
-print("[Mobile: Linear move] Ends")
+try:
+    while True:
+        try:
+            # Select Desired Distance
+            distance_cm = float(input(f"Enter the desired distance[cm] (+)Forward, (-)Backward: "))
+        except ValueError:
+            print("[ERROR] Invalid input. Please enter a number.")
+            continue
+        
+        distance_m = distance_cm * 0.01
+    
+        ysw.mobile_linear_distance(
+            robot,
+            distance_m=distance_m,
+            max_speed=0.25,
+            accel=0.8,
+            tolerance=0.01
+        )
+        
+        print("\n\n")
+        
+except KeyboardInterrupt:
+    print("\n[Mobile: Linear move] Ends")
+
+finally:
+    pass
