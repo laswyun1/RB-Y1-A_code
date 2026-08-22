@@ -75,11 +75,11 @@ def get_odom_2Dpose(robot):
 
 
 
-def build_mobile_cmd(v_x=0.0, v_y=0.0, yaw_rate=0.0, hold_time=0.2, acc=0.2):
+def build_mobile_cmd(v_x=0.0, v_y=0.0, yaw_vel=0.0, hold_time=0.2, acc=0.2):
     return rby.RobotCommandBuilder().set_command(
         rby.ComponentBasedCommandBuilder().set_mobility_command(
             rby.SE2VelocityCommandBuilder()
-            .set_velocity(np.array([v_x, v_y], dtype=np.float64), float(yaw_rate))
+            .set_velocity(np.array([v_x, v_y], dtype=np.float64), float(yaw_vel))
             .set_acceleration_limit(np.array([acc, acc], dtype=np.float64), float(acc))
             .set_command_header(
                 rby.CommandHeaderBuilder().set_control_hold_time(hold_time)
@@ -96,7 +96,7 @@ def stop_mobile(stream, acc=0.2, repeat=8):
         cmd = build_mobile_cmd(
             v_x=0.0, 
             v_y=0.0, 
-            yaw_rate=0.0, 
+            yaw_vel=0.0, 
             hold_time=0.3, 
             acc=acc
         )
@@ -110,10 +110,10 @@ def mobile_linear_distance(
     distance_m,         
     max_speed=0.25,     
     accel=0.05,
-    tolerance=0.01,     
+    tolerance_m=0.01,     
     dt=0.02,
     yaw_hold_kp=1.0,     
-    max_yaw_rate_for_hold=0.15,  
+    max_yaw_vel_for_hold=0.15,  
     stop_speed_eps=0.005,        
     verbose=True
 ):
@@ -127,13 +127,13 @@ def mobile_linear_distance(
             distance_m: desired moved distance, unit=[m]
             max_speed: allowable maximum speed, unit=[m/s]
             accel: used acceleration, unit=[m/s^2]
-            tolerance: distance error tolerance, unit=[m]
+            tolerance_m: distance error tolerance, unit=[m]
             yaw_hold_kp: P-gain for yaw maintenance
-            max_yaw_rate_for_hold: maximum value for control yaw_rate  
+            max_yaw_vel_for_hold: maximum value for control yaw_vel  
             stop_speed_eps: Stop algorithm is conducted until reach this value
     """  
 
-    if abs(distance_m) <= tolerance:
+    if abs(distance_m) <= tolerance_m:
         return True
     
     x0, y0, yaw0 = get_odom_2Dpose(robot)
@@ -169,17 +169,17 @@ def mobile_linear_distance(
             
             # yaw 유지 보정 (yaw 틀어짐 방지)
             yaw_error = normalize_angle(yaw - yaw0)
-            yaw_rate_cmd = clamp(
+            yaw_vel_cmd = clamp(
                 -yaw_hold_kp * yaw_error,
-                -max_yaw_rate_for_hold,
-                max_yaw_rate_for_hold,
+                -max_yaw_vel_for_hold,
+                max_yaw_vel_for_hold,
             )
             
             # =========================================================
             # [STOP phase]
             # If close enough to target, smoothly reduce commanded speed
             # =========================================================
-            if error <= tolerance:
+            if error <= tolerance_m:
                 desired_v_x = 0.0
 
                 max_dv = accel * dt
@@ -192,7 +192,7 @@ def mobile_linear_distance(
                 cmd = build_mobile_cmd(
                     v_x=v_x_cmd,
                     v_y=0.0,
-                    yaw_rate=0.0,
+                    yaw_vel=0.0,
                     hold_time=0.25,
                     acc=accel,
                 )
@@ -234,7 +234,7 @@ def mobile_linear_distance(
             cmd = build_mobile_cmd(
                 v_x=v_x_cmd,
                 v_y=0.0,
-                yaw_rate=yaw_rate_cmd,
+                yaw_vel=yaw_vel_cmd,
                 hold_time=0.25,
                 acc=accel,
             )
@@ -269,10 +269,162 @@ def mobile_linear_distance(
 
         
         
-        
-        
-        
-        
+def mobile_turn_inplace(
+    robot,
+    angle_deg,               # Unit = [deg], (+): positive yaw [CCW], (-): negative yaw [CW]
+    max_yaw_vel=0.30,        # Unit = [rad/s]
+    yaw_accel=1.5,           # Unit = [rad/s^2]
+    tolerance_deg=1.0,       # Unit = [deg]
+    dt=0.02,
+    stop_yaw_vel_eps=0.005,  # Unit = [rad/s]
+    verbose=True,
+):
+    """
+        Rotate mobile base by angle_deg using odometry feedback.
+
+        angle_deg > 0 : positive yaw direction (CCW)
+        angle_deg < 0 : negative yaw direction (CW)
+
+        Args:
+            angle_deg: desired rotation angle, unit=[deg]
+            max_yaw_vel: allowable maximum yaw angular velocity, unit=[rad/s]
+            yaw_accel: used yaw angular acceleration, unit=[rad/s^2]
+            tolerance_deg: yaw error tolerance, unit=[deg]
+            stop_yaw_vel_eps: Stop algorithm is conducted until yaw_vel reaches this value
+    """
+
+    angle_rad = np.deg2rad(angle_deg)
+    tolerance_rad = np.deg2rad(tolerance_deg)
+
+    if abs(angle_rad) <= tolerance_rad:
+        return True
+
+    _, _, yaw0 = get_odom_2Dpose(robot)
+
+    turn_sign = 1.0 if angle_rad >= 0.0 else -1.0
+    target_angle = abs(angle_rad)
+
+    yaw_vel_cmd = 0.0
+    last_print_time = 0.0
+
+    # For unwrapped yaw accumulation
+    prev_yaw = yaw0
+    accumulated_yaw = 0.0
+
+    stream = None
+
+    try:
+        stream = robot.create_command_stream(priority=1)
+
+        while True:
+            _, _, yaw = get_odom_2Dpose(robot)
+
+            # ---------------------------------------------------------
+            # Accumulate yaw change safely
+            # This prevents jump near +pi / -pi boundary
+            # ---------------------------------------------------------
+            delta_yaw = normalize_angle(yaw - prev_yaw)
+            accumulated_yaw += delta_yaw
+            prev_yaw = yaw
+
+            # Progress toward commanded turn direction
+            turned_angle = turn_sign * accumulated_yaw
+
+            # Remaining angle
+            error = target_angle - turned_angle
+
+            # =========================================================
+            # [STOP phase]
+            # If close enough or overshoot, do not reverse.
+            # Just reduce yaw_vel_cmd to zero.
+            # =========================================================
+            if error <= tolerance_rad:
+                desired_yaw_vel = 0.0
+
+                max_dr = yaw_accel * dt
+                yaw_vel_cmd += clamp(
+                    desired_yaw_vel - yaw_vel_cmd,
+                    -max_dr,
+                    max_dr,
+                )
+
+                cmd = build_mobile_cmd(
+                    v_x=0.0,
+                    v_y=0.0,
+                    yaw_vel=yaw_vel_cmd,
+                    hold_time=0.25,
+                    acc=yaw_accel,
+                )
+
+                stream.send_command(cmd, timeout_ms=500)
+
+                if verbose and time.time() - last_print_time > 0.2:
+                    print(
+                        f"[Turning Stop] "
+                        f"yaw_angle={np.rad2deg(accumulated_yaw):.2f}[deg], "
+                        f"yaw_velocity={yaw_vel_cmd:.3f}[rad/s], "
+                        f"yaw_error={np.rad2deg(error):.2f}[deg]"
+                    )
+                    last_print_time = time.time()
+
+                if abs(yaw_vel_cmd) <= stop_yaw_vel_eps:
+                    return True
+
+                time.sleep(dt)
+                continue
+
+            # =========================================================
+            # [Normal turning phase]
+            # =========================================================
+
+            # Remaining-angle-based safe yaw rate
+            # w^2 = 2 * alpha * theta
+            desired_yaw_vel_mag = np.sqrt(max(0.0, 2.0 * yaw_accel * max(0.0, error)))
+            desired_yaw_vel_mag = min(max_yaw_vel, desired_yaw_vel_mag)
+
+            # Do not use np.sign(error), because it can reverse direction after overshoot.
+            # Turn only in the commanded direction.
+            desired_yaw_vel = turn_sign * desired_yaw_vel_mag
+
+            # Limit yaw rate change
+            max_dr = yaw_accel * dt
+            yaw_vel_cmd += clamp(
+                desired_yaw_vel - yaw_vel_cmd,
+                -max_dr,
+                max_dr,
+            )
+
+            cmd = build_mobile_cmd(
+                v_x=0.0,
+                v_y=0.0,
+                yaw_vel=yaw_vel_cmd,
+                hold_time=0.25,
+                acc=yaw_accel,
+            )
+
+            stream.send_command(cmd, timeout_ms=500)
+
+            if verbose and time.time() - last_print_time > 0.2:
+                print(
+                    f"yaw_angle={np.rad2deg(accumulated_yaw):.2f}[deg], "
+                    f"yaw_velocity={yaw_vel_cmd:.3f}[rad/s], "
+                    f"yaw_error={np.rad2deg(error):.2f}[deg]"
+                )
+                last_print_time = time.time()
+
+            time.sleep(dt)
+
+    finally:
+        if stream is not None:
+            try:
+                stop_mobile(stream, acc=yaw_accel)
+            except Exception as e:
+                logging.warning(f"Failed to [stop_mobile]: {e}")
+
+            try:
+                stream.cancel()
+            except Exception as e:
+                logging.warning(f"Failed to cancel [mobile stream]: {e}")        
         
         
         

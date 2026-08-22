@@ -28,7 +28,7 @@ ysw.setupLogging()
 robotConfig = ysw.setRobotConfig(ysw.MODE_DIRECT_UPC, ysw.MODEL_A)
 robot = ysw.initialize(robotConfig.mode, robotConfig.address, robotConfig.model, option=ysw.CONNECT_ONLY)
 
-print("[Mobile: Linear move] Starts")
+print("[Mobile: Linear Move] Starts")
 
 try:
     while True:
@@ -46,13 +46,13 @@ try:
             distance_m=distance_m,
             max_speed=0.25,
             accel=0.8,
-            tolerance=0.01
+            tolerance_m=0.01
         )
         
         print("\n\n")
         
 except KeyboardInterrupt:
-    print("\n[Mobile: Linear move] Ends")
+    print("\n[Mobile: Linear Move] Ends")
 
 finally:
     pass
