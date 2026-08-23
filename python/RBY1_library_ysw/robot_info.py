@@ -483,7 +483,7 @@ HSV_MASK_GREEN  = [(np.array([35, 60, 60]), np.array([85, 255, 255]))]
 
 # Should be strictly measured!!!
 D435I_Z_OFFSET_FROM_LINK_HEAD_2      = 0.07      # Unit=[m]
-D435I_X_OFFSET_FROM_D435I_CENTER     = 0.0225    # Unit=[m], Origin standard: Left image camera | offset of D435i hardware center from measure frame
+D435I_X_OFFSET_FROM_D435I_CENTER     = 0.0175    # Unit=[m], Origin standard: Left image camera | offset of D435i origin frame(measure) from the hardware center 
 D435I_DEPTH_Z_OFFSET_FROM_LENS_PLANE = -0.01     # Unit=[m], Reference=Lens plane | Depth(z) standard point position offset relative to D435i lens plane
 
 
