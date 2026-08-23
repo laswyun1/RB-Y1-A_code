@@ -107,6 +107,79 @@ class Gripper:
                 
         UTIL.print_end_title("Gripper Ping Test is Done")
         return True
+    
+    
+    def connect_hardCheck(
+        self, 
+        device_name="/dev/rby1_gripper", 
+        protocol_version=2.0, 
+        baudrate=2000000,
+        retry_interval=1.0,
+        max_retry=5
+    ) -> bool:
+        """
+            Connection function (Strict version): "connect" + "test_ping"
+
+            This function waits until both grippers are connected and ping test passes.
+
+            Args:
+                device_name: Dynamixel device path
+                protocol_version: Dynamixel protocol version
+                baudrate: Dynamixel baudrate
+                retry_interval: waiting time between retries [s]
+                max_retry:
+                    None: retry forever
+                    int : retry up to max_retry times
+
+            Return:
+                True: connection and ping test succeeded
+                False: failed after max_retry
+            
+            [Ex] gripper.connect_hardCheck(
+                    device_name=ysw.GRIPPER_DEVICE_NAME, 
+                    protocol_version=ysw.DXL_PROTOCOL_VERSION, 
+                    baudrate=ysw.DXL_BAUDRATE,
+                )
+        """
+        UTIL.print_start_title("Gripper Hard Connection Starts")
+
+        attempt = 0
+
+        while True:
+            attempt += 1
+
+            print(f"[Gripper] Trying to connect gripper... attempt={attempt}")
+
+            rv_connect = self.connect(
+                device_name=device_name,
+                protocol_version=protocol_version,
+                baudrate=baudrate,
+            )
+
+            if rv_connect:
+                rv_ping = self.test_ping()
+            else:
+                rv_ping = False
+
+            print(f"[Gripper] connect={rv_connect}, ping_test={rv_ping}")
+
+            if rv_connect and rv_ping:
+                UTIL.print_end_title("Gripper Hard Connection is Done")
+                return True
+
+            # If connection opened but ping failed, close port before retry
+            try:
+                if self.port_hdlr is not None:
+                    self.port_hdlr.closePort()
+                    logging.warning("[Gripper] Port closed before retry.")
+            except Exception as e:
+                logging.warning(f"[Gripper] Failed to close port before retry: {e}")
+
+            if max_retry is not None and attempt >= max_retry:
+                logging.error("[Gripper] Hard connection failed: max retry reached.")
+                return False
+
+            time.sleep(retry_interval)
                 
                 
                 

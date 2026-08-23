@@ -95,6 +95,9 @@ class RealSenseDepthCamera:
             
             
     def startPipeline(self):
+        if self.is_started:
+            logging.warning(f"[{self.name}] Pipeline is already started.")
+            return True
         try:
             self.profile = self.pipeline.start(self.config)
             self.is_started = True
@@ -251,6 +254,127 @@ class RealSenseDepthCamera:
         return pos  # [X,Y,Z]
     
     
+    def forceStopPipeline(self):
+        """
+            Force stop pipeline even if is_started flag is wrong.
+        """
+        try:
+            if self.pipeline is not None:
+                self.pipeline.stop()
+                logging.info(f"[{self.name}] Pipeline force-stopped.")
+
+        except RuntimeError as e:
+            logging.warning(f"[{self.name}] forceStopPipeline ignored: {e}")
+
+        except Exception as e:
+            logging.warning(f"[{self.name}] forceStopPipeline failed: {e}")
+
+        finally:
+            self.is_started = False
+            
+    
+    def hardwareReset(self, wait_sec=5.0):
+        """
+            Hardware reset RealSense device.
+            This is similar to unplug/replug at device level.
+        """
+        if self.serial_number is None:
+            logging.error(f"[{self.name}] Cannot hardware reset without serial_number.")
+            return False
+
+        # Stop current pipeline first
+        self.forceStopPipeline()
+
+        try:
+            ctx = rs.context()
+            devices = ctx.query_devices()
+
+            for dev in devices:
+                serial = dev.get_info(rs.camera_info.serial_number)
+                dev_name = dev.get_info(rs.camera_info.name)
+
+                if serial == self.serial_number:
+                    logging.warning(
+                        f"[{self.name}] Hardware reset device: "
+                        f"{dev_name}, serial={serial}"
+                    )
+
+                    dev.hardware_reset()
+
+                    # Device disconnects/reconnects internally.
+                    # Need to wait before creating/starting pipeline again.
+                    time.sleep(wait_sec)
+
+                    self.pipeline = None
+                    self.config = None
+                    self.align = None
+                    self.profile = None
+                    self.is_started = False
+
+                    return True
+
+            logging.error(f"[{self.name}] Device not found for hardware reset.")
+            return False
+
+        except Exception as e:
+            logging.error(f"[{self.name}] Hardware reset failed: {e}")
+            return False
+        
+    def restartPipeline(self, align_enable=True, sleep_sec=1.0):
+        """
+            Soft restart only.
+        """
+        self.forceStopPipeline()
+        time.sleep(sleep_sec)
+
+        self.initialize(align_enable=align_enable)
+
+        return self.startPipeline()
+    
+    
+    def recoverPipeline(
+        self,
+        align_enable=True,
+        try_hardware_reset=True,
+        wait_after_reset_sec=5.0,
+    ):
+        """
+            Camera recovery routine.
+
+            Step 1: soft restart
+            Step 2: hardware reset if soft restart fails
+        """
+
+        logging.warning(f"[{self.name}] Try soft pipeline restart...")
+        rv = self.restartPipeline(align_enable=align_enable, sleep_sec=1.0)
+
+        if rv is True:
+            logging.info(f"[{self.name}] Soft restart success.")
+            return True
+
+        if not try_hardware_reset:
+            return False
+
+        logging.warning(f"[{self.name}] Soft restart failed. Try hardware reset...")
+
+        rv_reset = self.hardwareReset(wait_sec=wait_after_reset_sec)
+
+        if rv_reset is False:
+            return False
+
+        # After hardware reset, recreate pipeline/config
+        self.initialize(align_enable=align_enable)
+
+        rv = self.startPipeline()
+
+        if rv is True:
+            logging.info(f"[{self.name}] Hardware reset recovery success.")
+            return True
+
+        logging.error(f"[{self.name}] Hardware reset recovery failed.")
+        return False
+    
+    
     def openWindowWithMouse(self, image_name):
         """
         Open the image window including mouse left click interrupt
@@ -381,7 +505,8 @@ class RealSenseDepthCamera:
         color_image, 
         depth_frame, 
         mask_list, 
-        minimum_area, 
+        minimum_area=None, 
+        maximum_area=None, 
         maximum_depth=None,
         pixel_roi_x=None,   # [x_min, x_max] or None
         pixel_roi_y=None,   # [y_min, y_max] or None
@@ -393,6 +518,7 @@ class RealSenseDepthCamera:
             color_image
             depth_frame
             mask_list
+            minimum_area
             minimum_area
             maximum_depth:
                 If not None, points with depth >= maximum_depth are ignored.(Ex. floor) 
@@ -470,7 +596,9 @@ class RealSenseDepthCamera:
         for contour in contours:
             area = cv2.contourArea(contour)
 
-            if area < minimum_area:
+            if minimum_area is not None and area < minimum_area:
+                continue
+            if maximum_area is not None and area > maximum_area:
                 continue
 
             # Create mask for each object contour

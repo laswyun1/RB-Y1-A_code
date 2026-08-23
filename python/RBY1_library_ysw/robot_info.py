@@ -283,6 +283,17 @@ DEMO_RIGHT_TO_LEFT_POS_AFTER_260723 = {"torso":    np.deg2rad([0.0, 30.0, -60.0,
                                        "head":      np.deg2rad([0.0, 40.0])}
 
 
+# =============================================================================
+# [260826] DEMO-specific 22-DoF Joint Position for (Head + Body) Postures 
+# =============================================================================
+# 처음 테이블을 바라보고 있는 상태(시작 상태)
+DEMO_BASIC_POS_260826 = {"torso":     np.deg2rad([0.0, 25.0, -50.0,  25.0, 0.0,  0.0]),
+                         "right_arm": np.deg2rad([0.0, -28.0,  0.0, -140.0, 0.0, 100.0, 90.0]),
+                         "left_arm":  np.deg2rad([0.0,  28.0,  0.0, -140.0, 0.0, 100.0, -90.0]),
+                         "head":      np.deg2rad([0.0, 43.0])}
+
+
+
 
 # =============================================================================
 # 2-DoF Joint Position for (Head) Postures [0: Yaw, 1: Pitch]
@@ -451,13 +462,19 @@ SUPPORT_FRAME_ANGLE = 25        # Unit: [deg], 레인보우로보틱스에서 �
 # (Ex): [([Lower bound 1], [upper bound 1]), ([Lower bound 2], [upper bound 2]), ...]
 # =============================================================================
 
-HSV_MASK_RED    = [(np.array([0, 80, 80]), np.array([10, 255, 255])),
-                   (np.array([170, 80, 80]), np.array([180, 255, 255]))]
+HSV_MASK_RED      = [(np.array([0, 80, 80]), np.array([10, 255, 255])),       
+                     (np.array([170, 80, 80]), np.array([180, 255, 255]))]
+HSV_MASK_RED_BOX  = [(np.array([0, 128, 98]), np.array([4, 255, 255])),
+                     (np.array([176, 128, 98]), np.array([179, 255, 255]))]
 # HSV_MASK_BLACK  = [(np.array([0, 0, 0]), np.array([179, 255, 30]))]       # Strict
-HSV_MASK_BLACK  = [(np.array([0, 0, 0]), np.array([179, 255, 60]))]         # Not strict
+HSV_MASK_BLACK    = [(np.array([0, 0, 0]), np.array([179, 255, 60]))]         # Not strict
+HSV_MASK_BLACK_BOX  = [(np.array([0, 0, 0]), np.array([179, 255, 70]))]     # Not strict
 HSV_MASK_SILVER = [(np.array([0, 0, 80]), np.array([180, 60, 255]))]
 # HSV_MASK_YELLOW = [(np.array([15, 40, 40]), np.array([45, 255, 255]))]
 HSV_MASK_YELLOW = [(np.array([10, 100, 80]), np.array([35, 255, 255]))]
+
+HSV_MASK_ORANGE = [(np.array([4, 80, 60]), np.array([24, 255, 255]))]
+HSV_MASK_GREEN  = [(np.array([35, 60, 60]), np.array([85, 255, 255]))]
 
 
 # =============================================================================
