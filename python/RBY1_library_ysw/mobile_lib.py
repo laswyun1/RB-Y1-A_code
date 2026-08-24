@@ -104,7 +104,7 @@ def stop_mobile(stream, acc=0.2, repeat=8):
         time.sleep(0.03)
         
         
-
+# 충전기 빼고 사용!! (가끔 충전기 꽂고 실행하면 expire stream 에러 나옴)
 def mobile_linear_distance(
     robot,
     distance_m,         
@@ -253,6 +253,10 @@ def mobile_linear_distance(
 
             time.sleep(dt)
 
+    except Exception as e:
+        logging.exception(f"[mobile_linear_distance] failed: {e}")
+        return False
+    
     # For Emergency, Make sure STOP
     finally:
         if stream is not None:
