@@ -194,14 +194,15 @@ def getInfo(robot):
     
     
     
-def getState(robot):
+def getState(robot, verbose=True):
     """
     [Ex] ysw.getState(robot)
     """ 
     UTIL.print_start_title("Robot State Starts")
     
     robot_state = robot.get_state()
-    print(repr(robot_state))
+    if (verbose == True):
+        print(repr(robot_state))
     
     UTIL.print_end_title("Robot State Ends")  
     return robot_state  

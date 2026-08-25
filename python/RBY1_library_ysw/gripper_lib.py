@@ -736,17 +736,25 @@ class Gripper:
         if ((dxl_id == None) or (dxl_id not in [RI.GRIPPER_ID_R, RI.GRIPPER_ID_L])):
             logging.error("Invalid DXL ID")
             return False
+        
         if dxl_id in self.dxl_activated:
-            self.write_torque_mode(dxl_id=dxl_id, torque_mode=RI.DXL_TORQUE_DISABLE)
+            while (self.write_torque_mode(dxl_id=dxl_id, torque_mode=RI.DXL_TORQUE_DISABLE) != True):
+                logging.warning(f"[DXL ID:{dxl_id}] Retry torque disable")
+                time.sleep(0.1)
             # self.write_current_limit(dxl_id=dxl_id, current_limit_A=RI.DXL_CURRENT_LIMIT_MAX_A_YSW)  # You Never use this (You don't need to set current limit)
             
             if operation_mode in RI.DXL_CONTROL_MODE:
-                self.write_operation_mode(dxl_id=dxl_id, operation_mode=operation_mode)
+                while (self.write_operation_mode(dxl_id=dxl_id, operation_mode=operation_mode) != True):
+                    logging.warning(f"[DXL ID:{dxl_id}] Retry operation mode setting")
+                    time.sleep(0.1)
             else:
                 logging.error("Invalid DXL Operation Mode")
                 return False
                 
-            self.write_torque_mode(dxl_id=dxl_id, torque_mode=RI.DXL_TORQUE_ENABLE)
+            while (self.write_torque_mode(dxl_id=dxl_id, torque_mode=RI.DXL_TORQUE_ENABLE) != True):
+                logging.warning(f"[DXL ID:{dxl_id}] Retry torque enable")
+                time.sleep(0.1)
+                
             UTIL.print_end_title(f"Gripper [DXL ID:{dxl_id}] setting is Done")
             return True
         else:

@@ -30,6 +30,15 @@
     (11) Check the shelf distance by vision camera
     
     (12) Move forward to shelf and Lay two Boxes 
+    
+    
+    
+    **********************************************************
+        position control이나 mobile 관련 함수 실행 중 에러나서 멈추면,   
+        - python3 poweroff.py                               
+        - python3 initialize.py 
+        실행 후 demoFile_260826.py 실행                        
+    ***********************************************************
 """
 
 # ==========================================================================================================
@@ -1009,7 +1018,7 @@ def set_fixed_joint_targets(robot):
         Fix current torso_0 ~ torso_3 joint positions.
         It can be changed by USER
     """
-    current_joint_position = ysw.getState(robot).position
+    current_joint_position = ysw.getState(robot, verbose=False).position
 
     fixed_joint_targets = {
         "torso_0": current_joint_position[ysw.ALL_JOINT_INDEX["torso_0"]],
@@ -1119,6 +1128,7 @@ def positionCtrl_by_pos_and_T_orientation(
     )
     return rv
     
+    
 # Calculate the gripper opening distance
 def compute_desired_gripper_open_pos_mm(
     object_3Dsize,
@@ -1140,6 +1150,7 @@ def compute_desired_gripper_open_pos_mm(
 
     return desiredGripperPos_mm
 
+
 # Gripper Open by position control
 def open_gripper_for_grasp(
     gripper,
@@ -1151,17 +1162,27 @@ def open_gripper_for_grasp(
 ):
     """
         Open selected gripper using current-based position control.
+        이게 가끔 안열리는 경우가 있어서, safety 추가
     """
 
     dxl_id = get_target_gripper_id(grasp_arm)
-
+    
+    # # Manual safety checker
+    # while gripper.disable(dxl_id) is False:
+    #     time.sleep(0.1)
+        
     gripper.initialize_setting(dxl_id=dxl_id, operation_mode=ysw.DXL_CURRENT_BASED_POSITION_CONTROL_MODE)
-    gripper.current_based_position_control_linear(dxl_id, current_ampere_mag=current_ampere_mag, linear_pos=desiredGripperPos_mm)
+        
+    while (gripper.current_based_position_control_linear(dxl_id, current_ampere_mag=current_ampere_mag, linear_pos=desiredGripperPos_mm) != True):
+        logging.warning(f"[DXL ID:{dxl_id}] Retry gripper open command")
+        time.sleep(0.1)
+        
     time.sleep(sleep_sec)
 
-    if disable_after_open:
-        gripper.disable(dxl_id)
-        time.sleep(sleep_sec)
+    # if disable_after_open:
+    #     while gripper.disable(dxl_id) is False:
+    #         time.sleep(0.1)
+
 
 # Gripper Close by current control
 def close_gripper_for_grasp(
@@ -1180,7 +1201,7 @@ def close_gripper_for_grasp(
     gripper.write_current_ampere(dxl_id, grasp_current_obj)
     time.sleep(sleep_sec)
     
-
+    
 # Pick one Object and place it to Box
 def pick_object_and_place_to_box(
     robot,
@@ -1275,7 +1296,7 @@ def pick_object_and_place_to_box(
         grasp_arm=grasp_arm,
         desiredGripperPos_mm=desiredGripperPos_mm,
         current_ampere_mag=0.02,
-        sleep_sec=1.0,
+        sleep_sec=1.5,
         disable_after_open=True,
     )
 
@@ -1313,7 +1334,7 @@ def pick_object_and_place_to_box(
         gripper=gripper,
         grasp_arm=grasp_arm,
         grasp_current_obj=grasp_current_obj,
-        sleep_sec=1.0,
+        sleep_sec=1.0
     )
 
     # ============================================================
@@ -1381,7 +1402,7 @@ def pick_object_and_place_to_box(
         grasp_arm=grasp_arm,
         desiredGripperPos_mm=desiredGripperPos_mm,
         current_ampere_mag=0.02,
-        sleep_sec=1.0,
+        sleep_sec=1.5,
         disable_after_open=True,
     )
     
@@ -1397,7 +1418,7 @@ def pick_object_and_place_to_box(
         gripper=gripper,
         grasp_arm=grasp_arm,
         grasp_current_obj=grasp_current_obj,
-        sleep_sec=1.0,
+        sleep_sec=1.0
     )
     
     
@@ -1502,7 +1523,7 @@ def grasp_box_outerside_and_lift(
         grasp_arm=grasp_arm,
         desiredGripperPos_mm=desiredGripperPos_mm,
         current_ampere_mag=0.02,
-        sleep_sec=1.0,
+        sleep_sec=1.5,
         disable_after_open=True,
     )
 
@@ -1547,7 +1568,7 @@ def grasp_box_outerside_and_lift(
         gripper=gripper,
         grasp_arm=grasp_arm,
         grasp_current_obj=box_grasp_current,
-        sleep_sec=1.0,
+        sleep_sec=1.0
     )
 
     # ============================================================
@@ -1803,7 +1824,7 @@ vision_record_duration_checkObject = 5.0      # [sec]
 box_minimum_area = 8000                       # [pixel^2]
 box_maximum_distance = 1.2                    # [m]
 object_minimum_area = 50                      # [pixel^2]
-object_maximum_area = 1500                    # [pixel^2]
+object_maximum_area = 1000                    # [pixel^2]
 object_maximum_distance = 1.2                 # [m]
 
 
@@ -1812,12 +1833,12 @@ object_maximum_distance = 1.2                 # [m]
 offset_gripper_open_m = 0.015  # [m]
 object_manual_offset_downToGrasp = -0.005      # [m] for z-direction offset when grasp
 object_floating_z = 0.117 - object_manual_offset_downToGrasp     # [m]
-object_manual_offset_downToGrasp_blackObj = -0.004      # [m] for z-direction offset when grasp
-object_floating_z_blackObj  = 0.118 - object_manual_offset_downToGrasp_blackObj      # [m]
-object_manual_offset_downToGrasp_redObj  = -0.007      # [m] for z-direction offset when grasp
-object_floating_z_redObj = 0.115 - object_manual_offset_downToGrasp_redObj     # [m]
+object_manual_offset_downToGrasp_blackObj = -0.006      # [m] for z-direction offset when grasp
+object_floating_z_blackObj  = 0.116 - object_manual_offset_downToGrasp_blackObj      # [m]
+object_manual_offset_downToGrasp_redObj  = -0.010      # [m] for z-direction offset when grasp
+object_floating_z_redObj = 0.112 - object_manual_offset_downToGrasp_redObj     # [m]
 object_pregrasp_z_offset = +0.1   # [m]
-object_grasp_x_offset = +0.015   # [m]
+object_grasp_x_offset = +0.014   # [m]
 
 box_pregrasp_z_offset = +0.05   # [m]
 box_grasp_z_offset = -0.065   # [m]
@@ -1825,8 +1846,8 @@ box_grasp_floating_offset = 0.08    # [m]
 box_grasp_x_offset  = -0.04    # [m] outer side center point에서, 조금 더 앞쪽을 잡기 위한 offset 
 box_grasp_y_offset  = 0.05    # [m] 그리퍼가 양쪽 모두 바깥 side보다 더 바깥쪽으로 배치되는 경향을 보정
 
-box_move_readyPosition_right = np.array([0.55, -0.25, 1.22])      # desired position of "ee_finger_r1" from "base"  
-box_move_readyPosition_left = np.array([0.55, 0.25, 1.22])        # desired position of "ee_finger_l1" from "base"  
+box_move_readyPosition_right = np.array([0.55, -0.25, 1.2])      # desired position of "ee_finger_r1" from "base"  
+box_move_readyPosition_left = np.array([0.55, 0.25, 1.2])        # desired position of "ee_finger_l1" from "base"  
 
 
 
@@ -1849,7 +1870,8 @@ pixel_roi_y_tableDistance = [320, height]
 
 # table위 물체 detection에 사용하는 ROI (Posture: DEMO_BASIC_POS_260826)
 pixel_roi_x_tableTop = None
-pixel_roi_y_tableTop = [150, height]
+# pixel_roi_y_tableTop = [150, height]
+pixel_roi_y_tableTop = [150, height - 50]
 
 # 박스를 grasp하고, 180도 돌아서 shelf까지 갈 때 사용하는 ROI 
 pixel_roi_x_shelfDistance = [130, width - 130]      
@@ -1883,6 +1905,7 @@ gripper.connect_hardCheck(
     retry_interval=1.0,
     max_retry=5
 )
+time.sleep(1)
 
 # ----------------------------------------------------------
 # Depth Camera Initialization
@@ -1892,10 +1915,13 @@ gripper.connect_hardCheck(
 # ----------------------------------------------------------
 d435i = ysw.RealSenseDepthCamera(rgb_on=True, depth_on=True, pixel=(640,480), fps=30, serial_number=ysw.HEAD_D435I_SERIAL)
 d435i.initialize()
+time.sleep(1)
 d405_R = ysw.RealSenseDepthCamera(rgb_on=True, depth_on=True, pixel=(640,480), fps=30, serial_number=ysw.RIGHT_D405_SERIAL)
 d405_R.initialize()
+time.sleep(1)
 d405_L = ysw.RealSenseDepthCamera(rgb_on=True, depth_on=True, pixel=(640,480), fps=30, serial_number=ysw.LEFT_D405_SERIAL)
 d405_L.initialize()
+time.sleep(1)
 
 
 
@@ -1985,12 +2011,13 @@ desired_pos = ysw.DEMO_BASIC_POS_260826
 ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time, control_hold_time=0.5)
 
 
+
 # ==========================================================================================================
 # [Move] Move forward to Table
 # ==========================================================================================================
 ysw.print_demoStep(step=5, text="(Mobile) Move Forward to Table")
 
-# 충전기 빼고 사용!! (가끔 충전기 꽂고 실행하면 expire stream 에러 나옴)
+# expire stream 에러 가끔 나오는데 원인 불명
 ysw.mobile_linear_distance(
     robot,
     distance_m=moved_distance_to_table,
@@ -1998,6 +2025,7 @@ ysw.mobile_linear_distance(
     accel=0.8,
     tolerance_m=0.01
 )
+
 
 
 # ==========================================================================================================
@@ -2040,7 +2068,7 @@ result_blackObj = check_colored_objects_sorted_by_center(
     pixel_roi_y=pixel_roi_y_tableTop,
     max_match_distance_pixel=40.0,
     min_rank_sample_ratio=0.4,
-    min_rank_num_samples=20,
+    min_rank_num_samples=50,
     verbose=True,
 )
 
@@ -2077,7 +2105,7 @@ for obj_idx, blackObj_sample_avg in enumerate(blackObj_sample_avg_list):
         object_grasp_x_offset=object_grasp_x_offset, 
         box_grasp_z_offset=box_grasp_z_offset,
         box_grasp_x_offset=box_grasp_x_offset,
-        box_grasp_y_offset=box_grasp_y_offset,
+        box_grasp_y_offset=box_grasp_y_offset - 0.01,       # manual
         use_median=False,
         gripper_z_offset=ysw.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER,
         verbose=True,
@@ -2169,7 +2197,7 @@ result_redObj = check_colored_objects_sorted_by_center(
     pixel_roi_y=pixel_roi_y_tableTop,
     max_match_distance_pixel=40.0,
     min_rank_sample_ratio=0.4,
-    min_rank_num_samples=20,
+    min_rank_num_samples=50,
     verbose=True,
 )
 
@@ -2203,9 +2231,9 @@ for obj_idx, redObj_sample_avg in enumerate(redObj_sample_avg_list):
         grasp_arm=grasp_arm_redObj,
         object_manual_offset_downToGrasp=object_manual_offset_downToGrasp_redObj,
         object_pregrasp_z_offset=object_pregrasp_z_offset,
-        object_grasp_x_offset=object_grasp_x_offset, 
+        object_grasp_x_offset=object_grasp_x_offset - 0.001, # Manual 
         box_grasp_z_offset=box_grasp_z_offset - 0.008,       # Manual
-        box_grasp_x_offset=box_grasp_x_offset,
+        box_grasp_x_offset=box_grasp_x_offset - 0.005,       # Manual
         box_grasp_y_offset=box_grasp_y_offset,
         use_median=False,
         gripper_z_offset=ysw.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER,
@@ -2299,7 +2327,7 @@ rv = grasp_box_outerside_and_lift(
 ysw.print_demoStep(step=17, text="(Posture) DEMO_MOVE_POS_260826")
 
 desired_pos = ysw.DEMO_MOVE_POS_260826  
-ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time * 0.3, control_hold_time=0.5)
+ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time * 0.6, control_hold_time=0.5)
 
 
 
@@ -2362,7 +2390,7 @@ desired_yaw_deg = -176                   # Unit: [deg], (+): CCW, (-): CW
 ysw.mobile_turn_inplace(
     robot,
     angle_deg=desired_yaw_deg, 
-    max_yaw_vel=0.3,
+    max_yaw_vel=0.6,
     yaw_accel=1.5,
     tolerance_deg=1.0
 )
@@ -2437,9 +2465,9 @@ finally:
     d435i.stopPipeline()
     d435i.destroyAllWindows()
 
-# ============================================================
+# ------------------
 # Average Distance
-# ============================================================
+#-------------------
 if len(distance_list) == 0:
     raise RuntimeError("[ERROR] No valid table distance was measured.")
 
@@ -2455,7 +2483,7 @@ print(f"Shelf Distance Std    : {distance_std:.4f} [m]")
 
 moved_distance_to_shelf = distance_avg - offset_shelf_distance
 
-print(f"\offset_shelf_distance : {offset_shelf_distance:.4f} [m]")
+print(f"\noffset_shelf_distance : {offset_shelf_distance:.4f} [m]")
 print(f"moved_distance_to_shelf: {moved_distance_to_shelf:.4f} [m]")
 
 
@@ -2463,7 +2491,7 @@ print(f"moved_distance_to_shelf: {moved_distance_to_shelf:.4f} [m]")
 # ==========================================================================================================
 # [Mobile] Move Forward to Shelf
 # ==========================================================================================================
-ysw.print_demoStep(step=21, text="(Mobile) Move Forward to Shelf")
+ysw.print_demoStep(step=22, text="(Mobile) Move Forward to Shelf")
 
 ysw.mobile_linear_distance(
     robot,
@@ -2478,7 +2506,7 @@ ysw.mobile_linear_distance(
 # ==========================================================================================================
 # [Gripper] Open grippers (Lay Boxes) and Close grippers
 # ==========================================================================================================
-ysw.print_demoStep(step=22, text="(Gripper) Lay Boxes")
+ysw.print_demoStep(step=23, text="(Gripper) Lay Boxes")
 
 gripper.initialize_setting(dxl_id=ysw.GRIPPER_ID_L, operation_mode=ysw.DXL_CURRENT_CONTROL_MODE)
 gripper.write_current_ampere(dxl_id=ysw.GRIPPER_ID_L, current_ampere=gripper_open_ampere)
@@ -2502,7 +2530,7 @@ time.sleep(1)
 # ==========================================================================================================
 # [Mobile] Go initial states
 # ==========================================================================================================
-ysw.print_demoStep(step=23, text="(Mobile) Move Backward slightly and Turn Left 180 degree")
+ysw.print_demoStep(step=24, text="(Mobile) Move Backward slightly and Turn Left 180 degree")
 
 moved_distance_to_back = -0.7
 ysw.mobile_linear_distance(
@@ -2518,7 +2546,7 @@ desired_yaw_deg = +176                   # Unit: [deg], (+): CCW, (-): CW
 ysw.mobile_turn_inplace(
     robot,
     angle_deg=desired_yaw_deg, 
-    max_yaw_vel=0.3,
+    max_yaw_vel=0.6,
     yaw_accel=1.5,
     tolerance_deg=1.0
 )
@@ -2529,7 +2557,7 @@ time.sleep(1)
 # ==========================================================================================================
 # [Posture] DEMO_MOVE_POS_260826
 # ==========================================================================================================
-ysw.print_demoStep(step=24, text="(Posture) DEMO_MOVE_POS_260826")
+ysw.print_demoStep(step=25, text="(Posture) DEMO_MOVE_POS_260826")
 
 desired_pos = ysw.PACK_POS  
 ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_minimum_time, control_hold_time=0.5)
