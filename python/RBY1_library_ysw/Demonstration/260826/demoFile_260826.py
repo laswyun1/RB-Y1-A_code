@@ -695,7 +695,8 @@ def compute_IK_for_colored_object_and_box(
     object_pregrasp_z_offset=+0.1,             # can be manually changed 
     object_grasp_x_offset=0.0,                 # can be manually changed (theoretically it should be zero)
     box_pregrasp_z_offset=0.05,      # can be manually changed, {N1}: before opening gripper, above box outer side-top [m]
-    box_grasp_z_offset=-0.01,         # can be manually changed, {N2}: after opening gripper, down to  box outer side-top [m]
+    box_grasp_z_offset=-0.01,        # can be manually changed, {N2}: after opening gripper, down to  box outer side-top [m]
+    box_grasp_x_offset=-0.04,        # can be manually changed, To grasp front part of outer-side of box
     box_grasp_y_offset=0.05,         # can be manually changed, absolute value (theoretically it should be zero)
     use_median=False,
     gripper_z_offset=ysw.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER,
@@ -1811,6 +1812,10 @@ object_maximum_distance = 1.2                 # [m]
 offset_gripper_open_m = 0.015  # [m]
 object_manual_offset_downToGrasp = -0.005      # [m] for z-direction offset when grasp
 object_floating_z = 0.117 - object_manual_offset_downToGrasp     # [m]
+object_manual_offset_downToGrasp_blackObj = -0.004      # [m] for z-direction offset when grasp
+object_floating_z_blackObj  = 0.118 - object_manual_offset_downToGrasp_blackObj      # [m]
+object_manual_offset_downToGrasp_redObj  = -0.007      # [m] for z-direction offset when grasp
+object_floating_z_redObj = 0.115 - object_manual_offset_downToGrasp_redObj     # [m]
 object_pregrasp_z_offset = +0.1   # [m]
 object_grasp_x_offset = +0.015   # [m]
 
@@ -1820,8 +1825,8 @@ box_grasp_floating_offset = 0.08    # [m]
 box_grasp_x_offset  = -0.04    # [m] outer side center point에서, 조금 더 앞쪽을 잡기 위한 offset 
 box_grasp_y_offset  = 0.05    # [m] 그리퍼가 양쪽 모두 바깥 side보다 더 바깥쪽으로 배치되는 경향을 보정
 
-box_move_readyPosition_right = np.array([0.55, -0.25, 1.2])      # desired position of "ee_finger_r1" from "base"  
-box_move_readyPosition_left = np.array([0.55, 0.25, 1.2])        # desired position of "ee_finger_l1" from "base"  
+box_move_readyPosition_right = np.array([0.55, -0.25, 1.22])      # desired position of "ee_finger_r1" from "base"  
+box_move_readyPosition_left = np.array([0.55, 0.25, 1.22])        # desired position of "ee_finger_l1" from "base"  
 
 
 
@@ -2027,12 +2032,12 @@ result_blackObj = check_colored_objects_sorted_by_center(
     depthCamObj=d435i,
     objectColor="black",
     hsv_mask=ysw.HSV_MASK_BLACK_BOX,
-    record_duration=vision_record_duration_checkBox,
+    record_duration=vision_record_duration_checkObject,
     object_minimum_area=object_minimum_area,
     object_maximum_area=object_maximum_area,
-    maximum_depth=box_maximum_distance,
+    maximum_depth=object_maximum_distance,
     pixel_roi_x=pixel_roi_x_tableTop,
-    pixel_roi_y=pixel_roi_x_tableTop,
+    pixel_roi_y=pixel_roi_y_tableTop,
     max_match_distance_pixel=40.0,
     min_rank_sample_ratio=0.4,
     min_rank_num_samples=20,
@@ -2067,10 +2072,11 @@ for obj_idx, blackObj_sample_avg in enumerate(blackObj_sample_avg_list):
         boxColor="black",
         box_sample_avg=blackBox_sample_avg,
         grasp_arm=grasp_arm_blackObj,
-        object_manual_offset_downToGrasp=object_manual_offset_downToGrasp,
+        object_manual_offset_downToGrasp=object_manual_offset_downToGrasp_blackObj,
         object_pregrasp_z_offset=object_pregrasp_z_offset,
         object_grasp_x_offset=object_grasp_x_offset, 
         box_grasp_z_offset=box_grasp_z_offset,
+        box_grasp_x_offset=box_grasp_x_offset,
         box_grasp_y_offset=box_grasp_y_offset,
         use_median=False,
         gripper_z_offset=ysw.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER,
@@ -2100,7 +2106,7 @@ for obj_idx, black_target_result in enumerate(black_target_result_list):
         target_result=black_target_result,
         offset_gripper_open_m=offset_gripper_open_m,
         grasp_current_obj=grasp_current_obj,
-        object_floating_z_afterGrasp=object_floating_z,
+        object_floating_z_afterGrasp=object_floating_z_blackObj,
         position_control_minimum_time=position_control_minimum_time,
         control_hold_time=0.5,
         fix_torso=True,
@@ -2155,12 +2161,12 @@ result_redObj = check_colored_objects_sorted_by_center(
     depthCamObj=d435i,
     objectColor="red",
     hsv_mask=ysw.HSV_MASK_RED,
-    record_duration=vision_record_duration_checkBox,
+    record_duration=vision_record_duration_checkObject,
     object_minimum_area=object_minimum_area,
     object_maximum_area=object_maximum_area,
-    maximum_depth=box_maximum_distance,
+    maximum_depth=object_maximum_distance,
     pixel_roi_x=pixel_roi_x_tableTop,
-    pixel_roi_y=pixel_roi_x_tableTop,
+    pixel_roi_y=pixel_roi_y_tableTop,
     max_match_distance_pixel=40.0,
     min_rank_sample_ratio=0.4,
     min_rank_num_samples=20,
@@ -2195,10 +2201,11 @@ for obj_idx, redObj_sample_avg in enumerate(redObj_sample_avg_list):
         boxColor="red",
         box_sample_avg=redBox_sample_avg,
         grasp_arm=grasp_arm_redObj,
-        object_manual_offset_downToGrasp=object_manual_offset_downToGrasp,
+        object_manual_offset_downToGrasp=object_manual_offset_downToGrasp_redObj,
         object_pregrasp_z_offset=object_pregrasp_z_offset,
         object_grasp_x_offset=object_grasp_x_offset, 
         box_grasp_z_offset=box_grasp_z_offset - 0.008,       # Manual
+        box_grasp_x_offset=box_grasp_x_offset,
         box_grasp_y_offset=box_grasp_y_offset,
         use_median=False,
         gripper_z_offset=ysw.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER,
@@ -2228,7 +2235,7 @@ for obj_idx, red_target_result in enumerate(red_target_result_list):
         target_result=red_target_result,
         offset_gripper_open_m=offset_gripper_open_m,
         grasp_current_obj=grasp_current_obj,
-        object_floating_z_afterGrasp=object_floating_z,
+        object_floating_z_afterGrasp=object_floating_z_redObj,
         position_control_minimum_time=position_control_minimum_time,
         control_hold_time=0.5,
         fix_torso=True,
@@ -2350,7 +2357,7 @@ time.sleep(1)
 # ==========================================================================================================
 ysw.print_demoStep(step=20, text="(Mobile) Turn Right 180 degree")
 
-desired_yaw_deg = -176                   # Unit: [rad], (+): CCW, (-): CW
+desired_yaw_deg = -176                   # Unit: [deg], (+): CCW, (-): CW
 
 ysw.mobile_turn_inplace(
     robot,
@@ -2507,7 +2514,7 @@ ysw.mobile_linear_distance(
 )
 time.sleep(1)
 
-desired_yaw_deg = +176                   # Unit: [rad], (+): CCW, (-): CW
+desired_yaw_deg = +176                   # Unit: [deg], (+): CCW, (-): CW
 ysw.mobile_turn_inplace(
     robot,
     angle_deg=desired_yaw_deg, 
