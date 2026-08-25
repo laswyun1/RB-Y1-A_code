@@ -41,7 +41,16 @@ def check_yN(prompt: str) -> bool:
         if answer == "n":
             return False
         print("Please enter 'y' or 'N'.")
-
+        
+        
+def print_demoStep(step: int, text: str, width: int = 80, fill: str = "="):
+    msg = f"# STEP {step}: {text}"
+    line = "# " + fill * (width - 2)
+    print()
+    print(line)
+    print(msg)
+    print(line)
+    print()
 
 
 # =============================================================================
