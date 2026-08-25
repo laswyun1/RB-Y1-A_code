@@ -8,26 +8,28 @@
         - Box location can be changed
         
     (2) 4 Black Objects(25x25x25) and 4 Red Objects(25x25x25) are located between two Boxes
-        - Objects location can be changed
+        - Objects location and number can be changed
 
-    (3) Check the Locations of "Black & Red Boxes" and "Black-Leftmost object" and "Red-Rightmost object"
+    (3) Check the Locations of "Black Box" and all "Black Objects" -> calculate IK
 
-    (4) Pick the [Black-Leftmost] object using the Black Box located arm 
+    (4) Pick the [Black objects] (near the center has lower index=higher priority to pick) using the Black Box located arm 
         - Ex: If Black Box is in the left side of robot, using left arm
         
-    (5) Move the picking arm to Black Box and lay the Black Object
+    (5) Move the picking arm to Black Box and lay the Black Objects
         
-    (6) Likewise, Pick the [Red-Rightmost] object using the Red Box located arm 
-        - Ex: If Red Box is in the right side of robot, using right arm
-
-    (7) Move the picking arm to Red Box and lay the Red Object
-
-    (8) Repeat (4)-(7) until all objects are picked and placed
+    (6) Likewise, Do same works for [Red Box and Red Objects]
         
+    (7) Robot grasp the [Black Box's outer side]
+    
+    (8) Robot grasp the [Red Box's outer side]
+    
+    (9) Robot goes box-transfer ready posture
 
     (10) The robot slightly move backward, and turn right 180 degrees
 
-    (11) 
+    (11) Check the shelf distance by vision camera
+    
+    (12) Move forward to shelf and Lay two Boxes 
 """
 
 # ==========================================================================================================
