@@ -1009,3 +1009,118 @@ class Gripper:
          
         UTIL.print_end_title(f"Gripper [DXL ID:{dxl_id}] Tuning PID gain for Position Control Ends")
         return True
+
+
+
+
+# =============================================================================
+# General Functions for Gripper
+# =============================================================================
+def sign(x):
+    if x > 0:       return 1.0
+    elif x < 0:     return -1.0
+    else:           return 0.0
+    
+
+def trapezoidal_position_command(
+    gripper,
+    dxl_id,
+    start_pos_mm,
+    target_pos_mm,
+    current_ampere_mag=0.02,
+    v_max=20.0,      # mm/s
+    a_max=50.0,      # mm/s^2
+    dt=0.01,         # 100Hz
+    pos_tol=0.01,
+    vel_tol=0.01
+):
+    """
+        Trapezoidal trajectory generator.
+
+        x     : commanded position [mm]
+        v     : commanded velocity [mm/s]
+        a     : commanded acceleration [mm/s^2]
+
+        start_pos_mm  -> target_pos_mm 로 이동하면서
+        |v| <= v_max
+        |a| <= a_max
+        을 만족.
+    """
+    x = float(start_pos_mm)
+    v = 0.0
+    
+    while True:
+        # Remaining distance
+        error = target_pos_mm - x
+        
+        # Terminate condition
+        if abs(error) <= pos_tol and abs(v) <= vel_tol:
+            x = target_pos_mm
+            
+            gripper.current_based_position_control_linear(
+                dxl_id,
+                current_ampere_mag=current_ampere_mag,
+                linear_pos=x
+            )
+            break
+        
+        # -------------------------------------------------
+        # Trajectory Generator
+        # -------------------------------------------------
+        direction_to_goal = sign(error)
+        
+        # 현재 속도로부터 필요한 stopping distance
+        stopping_distance = (v**2) / (2.0 * a_max)
+        
+        # 현재 움직이는 방향
+        velocity_direction = sign(v)
+        
+        # 1. 목표 반대 방향으로 움직이고 있다면 먼저 감속
+        if velocity_direction != 0 and velocity_direction != direction_to_goal:
+            a = -velocity_direction * a_max
+
+        # 2. 이제 braking을 시작해야 할 경우
+        elif abs(error) <= stopping_distance:
+            if velocity_direction != 0:
+                a = -velocity_direction * a_max
+            else:
+                a = 0.0
+
+        # 3. 아직 충분한 거리가 남음 -> 가속
+        else:
+            if abs(v) < v_max:
+                a = direction_to_goal * a_max
+            else:
+                a = 0.0
+
+        # -------------------------------------------------
+        # velocity update
+        # -------------------------------------------------
+        v_new = v + a * dt
+
+        # velocity saturation
+        v_new = max(-v_max, min(v_max, v_new))
+
+        # -------------------------------------------------
+        # position update
+        # -------------------------------------------------
+        # 좀 더 정확한 integration
+        x_new = x + 0.5 * (v + v_new) * dt
+
+        # 목표를 지나쳐버리는 numerical overshoot 방지
+        if (target_pos_mm - x) * (target_pos_mm - x_new) < 0:
+            x_new = target_pos_mm
+            v_new = 0.0
+
+        x = x_new
+        v = v_new
+
+        # -------------------------------------------------
+        # Dynamixel command
+        # -------------------------------------------------
+        gripper.current_based_position_control_linear(
+            dxl_id,
+            current_ampere_mag=current_ampere_mag,
+            linear_pos=x
+        )
+        time.sleep(dt)

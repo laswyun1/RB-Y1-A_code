@@ -804,6 +804,10 @@ def convertPos_vision_to_linkhead2(pos_vision):
 
 
 
+
+
+
+
 # def calculateEEpos_forGrasp(object_pos_from_vision, object_3Dsize, object_offset_use=True, manual_offset: float=0.0):
 #     """
 #     This function calculates the position of final end-effector(NOT "ee_finger_r1" or "ee_finger_l1") based on "link_head_2"
@@ -905,3 +909,142 @@ def convertPos_vision_to_linkhead2(pos_vision):
 # =============================================================================
 # Function for D405 Wrist Camera
 # =============================================================================
+
+
+
+
+
+
+# =============================================================================
+# Common Functions for D435i/D405
+# =============================================================================
+
+# Vision-based center point depth(distance) detection of ROI
+def measure_depth_of_roi_center(
+    depthCamObj,
+    pixel_roi_x,
+    pixel_roi_y,
+    record_duration,
+    verbose=True,
+):
+    """
+    Measure the distance(depth) using the depth value of ROI center pixel.
+    To make sure "depth == distance", the depthCamObj should be parallel to ground. 
+
+    Args:
+        depthCamObj:
+            RealSenseDepthCamera object, e.g. d435i, d405
+
+        pixel_roi_x:
+            ROI x range, e.g. [140, 500]
+            If None, use full image width.
+
+        pixel_roi_y:
+            ROI y range, e.g. [320, 480]
+            If None, use full image height.
+
+        record_duration:
+            recording duration [sec]
+
+    Return:
+        average depth [m]
+    """
+
+    depth_list = []
+    roi_center_pixel = None
+    roi = None
+
+    rv = depthCamObj.startPipeline()
+    if rv is False:
+        raise RuntimeError(f"[{depthCamObj.name}] Failed to start pipeline.")
+
+    try:
+        start_time = time.time()
+
+        while True:
+            elapsed_time = time.time() - start_time
+
+            if elapsed_time >= record_duration:
+                break
+
+            color_frame, depth_frame = depthCamObj.getRawFrames()
+
+            if color_frame is None or depth_frame is None:
+                continue
+
+            color_image, depth_image = depthCamObj.frameToImage(color_frame, depth_frame)
+
+            if color_image is None or depth_image is None:
+                continue
+
+            h, w, _ = color_image.shape
+
+            # ROI center pixel in full image coordinate
+            if pixel_roi_x is None:
+                x_min = 0
+                x_max = w
+            else:
+                x_min, x_max = pixel_roi_x
+                x_min = int(np.clip(x_min, 0, w - 1))
+                x_max = int(np.clip(x_max, 0, w))
+
+            if pixel_roi_y is None:
+                y_min = 0
+                y_max = h
+            else:
+                y_min, y_max = pixel_roi_y
+                y_min = int(np.clip(y_min, 0, h - 1))
+                y_max = int(np.clip(y_max, 0, h))
+
+            x_roi_center = (x_min + x_max) // 2
+            y_roi_center = (y_min + y_max) // 2
+
+            roi_center_pixel = (x_roi_center, y_roi_center)
+            roi = [x_min, x_max, y_min, y_max]
+
+            # Get depth at ROI center pixel
+            depth = depthCamObj.getDepth(depth_frame, (x_roi_center, y_roi_center))   # unit: [m]
+
+            # invalid depth 제거
+            if depth <= 0.0:
+                if verbose:
+                    print("[WARNING] Invalid depth.")
+                continue
+
+            depth_list.append(depth)
+
+            if verbose:
+                print(f"ROI Center Depth: {depth:.3f} [m]")
+
+    finally:
+        depthCamObj.stopPipeline()
+        depthCamObj.destroyAllWindows()
+
+    # Average Depth
+    if len(depth_list) == 0:
+        raise RuntimeError("[ERROR] No valid depth was measured.")
+
+    depth_avg = float(np.mean(depth_list))
+
+    if verbose:
+        print("\n========== ROI center depth Result ==========")
+        print(f"num_samples   : {len(depth_list)}")
+        print(f"Average depth : {depth_avg:.4f} [m]")
+
+    return depth_avg
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

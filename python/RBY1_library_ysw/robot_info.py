@@ -489,7 +489,7 @@ GRIPPER_SAFETY_CLOSE_OFFSET          = -1.2*GRIPPER_SAFETY_OPEN_OFFSET        # 
 # IntelRealsense Depth Camera Info 
 # =============================================================================
 HEAD_D435I_SERIAL = "250122070658"
-RIGHT_D405_SERIAL  = "260322279815"
+RIGHT_D405_SERIAL = "260322279815"
 LEFT_D405_SERIAL  = "260422275816"
 
 SUPPORT_FRAME_ANGLE = 25        # Unit: [deg], 레인보우로보틱스에서 받은 손목카메라 프레임의 휘어진 각도
@@ -504,24 +504,30 @@ HSV_MASK_RED      = [(np.array([0, 80, 80]), np.array([10, 255, 255])),
                      (np.array([170, 80, 80]), np.array([180, 255, 255]))]
 HSV_MASK_RED_BOX  = [(np.array([0, 128, 98]), np.array([4, 255, 255])),
                      (np.array([176, 128, 98]), np.array([179, 255, 255]))]
-# HSV_MASK_BLACK  = [(np.array([0, 0, 0]), np.array([179, 255, 30]))]       # Strict
+# HSV_MASK_BLACK  = [(np.array([0, 0, 0]), np.array([179, 255, 30]))]       # strict
 HSV_MASK_BLACK    = [(np.array([0, 0, 0]), np.array([179, 255, 60]))]         # Not strict
 HSV_MASK_BLACK_BOX  = [(np.array([0, 0, 0]), np.array([179, 255, 70]))]     # Not strict
 HSV_MASK_SILVER = [(np.array([0, 0, 80]), np.array([180, 60, 255]))]
 # HSV_MASK_YELLOW = [(np.array([15, 40, 40]), np.array([45, 255, 255]))]
 HSV_MASK_YELLOW = [(np.array([10, 100, 80]), np.array([35, 255, 255]))]
-
 HSV_MASK_ORANGE = [(np.array([4, 80, 60]), np.array([24, 255, 255]))]
 HSV_MASK_GREEN  = [(np.array([35, 60, 60]), np.array([85, 255, 255]))]
-
+HSV_MASK_WHITE = [(np.array([0, 0, 180]), np.array([179, 60, 255]))]        # strict
+# HSV_MASK_WHITE = [(np.array([0, 0, 160]), np.array([179, 80, 255]))]        # Not strict
 
 # =============================================================================
-# D435i Parameters
+# D435i / D405 Parameters
 # =============================================================================
+
+# Pixel size
+D435I_PIXEL_WIDTH  = 640        # Can be changed
+D435I_PIXEL_HEIGHT = 480        # Can be changed
+D405_PIXEL_WIDTH   = 640        # Can be changed
+D405_PIXEL_HEIGHT  = 480        # Can be changed
 
 # Should be strictly measured!!!
 D435I_Z_OFFSET_FROM_LINK_HEAD_2      = 0.07      # Unit=[m]
-D435I_X_OFFSET_FROM_D435I_CENTER     = 0.0165     # Unit=[m], (Official: 0.0175m), Origin standard: Left image camera | offset of D435i origin frame(measure) from the hardware center 
+D435I_X_OFFSET_FROM_D435I_CENTER     = 0.0165    # Unit=[m], (Official: 0.0175m), Origin standard: Left image camera | offset of D435i origin frame(measure) from the hardware center 
 D435I_DEPTH_Z_OFFSET_FROM_LENS_PLANE = -0.01     # Unit=[m], Reference=Lens plane | Depth(z) standard point position offset relative to D435i lens plane
 
 
