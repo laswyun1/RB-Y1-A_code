@@ -1,5 +1,6 @@
 """
     This is the Revised Demo File for 260826
+    Principal operation is same as "demoFile_260826.py"
 
     [Scenario]
     (0) In 1st Floor Laboratory, the robot move forward to Table 
@@ -37,7 +38,7 @@
         position control이나 mobile 관련 함수 실행 중 에러나서 멈추면,   
         - python3 poweroff.py                               
         - python3 initialize.py 
-        실행 후 demoFile_260903.py 실행                        
+        실행 후 demoFile_260826_rev.py 실행                        
     ***********************************************************
 """
 
@@ -53,11 +54,12 @@ import cv2
 
 import sys
 from pathlib import Path
-# Path.cwd()           : folder "260826", 
-# Path.cwd().parents[0]: folder "Demonstration", 
+# Path.cwd()           : folder "260826"
+# Path.cwd().parents[0]: folder "Demonstration"
 # Path.cwd().parents[1]: folder "RBY1_library_ysw"
 sys.path.append(str(Path.cwd().parents[1]))                  
 import rby1_lib_ysw as ysw
+import functions_260826 as fn
 
 np.set_printoptions(suppress=True, precision=4, linewidth=300)  
 
@@ -73,81 +75,88 @@ logging.basicConfig(
 
 
 
-
 # ==========================================================================================================
 # Tuning Parameters
 # ==========================================================================================================
-# Position Control Speed
-position_control_minimum_time = 4      # [sec]
+state = 0    # Scenario Sequence (for Safety)   
+
+# Position Control speed
+position_control_minimum_time        = 4      # [sec]
 
 
-
-# Move to Table/shelf
-vision_record_duration_tableDistance = 5.0   # [sec]
-offset_table_distance = 0.4                  # [m]
-vision_record_duration_shelfDistance = 5.0   # [sec]
-offset_shelf_distance = 0.45                  # [m]
+# Vision for Table
+vision_record_duration_tableDistance = 5.0    # [sec]
+offset_table_distance                = 0.4    # [m]
 
 
-
-# Vision
+# Vision for Box/Object
 vision_record_duration_checkBox = 5.0         # [sec]
+box_minimum_area                = 10000       # [pixel^2]
+box_maximum_distance            = 1.0         # [m]
+
 vision_record_duration_checkObject = 5.0      # [sec]
-box_minimum_area = 8000                       # [pixel^2]
-box_maximum_distance = 1.2                    # [m]
-object_minimum_area = 50                      # [pixel^2]
-object_maximum_area = 1000                    # [pixel^2]
-object_maximum_distance = 1.2                 # [m]
+object_minimum_area                = 200      # [pixel^2]
+object_maximum_area                = 1000     # [pixel^2]
+object_maximum_distance            = 1.0      # [m]
 
 
-
-# Position Control 
-offset_gripper_open_m = 0.015  # [m]
-object_manual_offset_downToGrasp = -0.005      # [m] for z-direction offset when grasp
-object_floating_z = 0.117 - object_manual_offset_downToGrasp     # [m]
+# Position Control
+object_manual_offset_downToGrasp          = -0.005      # [m] for z-direction offset when grasp
 object_manual_offset_downToGrasp_blackObj = -0.006      # [m] for z-direction offset when grasp
-object_floating_z_blackObj  = 0.116 - object_manual_offset_downToGrasp_blackObj      # [m]
-object_manual_offset_downToGrasp_redObj  = -0.010      # [m] for z-direction offset when grasp
-object_floating_z_redObj = 0.112 - object_manual_offset_downToGrasp_redObj     # [m]
-object_pregrasp_z_offset = +0.1   # [m]
-object_grasp_x_offset = +0.014   # [m]
+object_manual_offset_downToGrasp_redObj   = -0.010      # [m] for z-direction offset when grasp
 
-box_pregrasp_z_offset = +0.05   # [m]
-box_grasp_z_offset = -0.065   # [m]
-box_grasp_floating_offset = 0.08    # [m]
-box_grasp_x_offset  = -0.04    # [m] outer side center point에서, 조금 더 앞쪽을 잡기 위한 offset 
-box_grasp_y_offset  = 0.05    # [m] 그리퍼가 양쪽 모두 바깥 side보다 더 바깥쪽으로 배치되는 경향을 보정
+object_pregrasp_z_offset         = +0.1        # [m]
+object_grasp_x_offset            = +0.014      # [m]
+box_pregrasp_z_offset            = +0.05       # [m]
+box_grasp_x_offset               = -0.04       # [m] outer side center point에서, 조금 더 앞쪽을 잡기 위한 offset 
+box_grasp_y_offset               = 0.05        # [m] 그리퍼가 양쪽 모두 바깥 side보다 더 바깥쪽으로 배치되는 경향을 보정
+box_grasp_z_offset               = -0.065      # [m]
 
-box_move_readyPosition_right = np.array([0.55, -0.25, 1.2])      # desired position of "ee_finger_r1" from "base"  
-box_move_readyPosition_left = np.array([0.55, 0.25, 1.2])        # desired position of "ee_finger_l1" from "base"  
+offset_gripper_open_m       = 0.015      # [m]
+grasp_current_obj           = 0.15       # [A]
+object_floating_z           = 0.117 - object_manual_offset_downToGrasp            # [m]
+object_floating_z_blackObj  = 0.116 - object_manual_offset_downToGrasp_blackObj   # [m]
+object_floating_z_redObj    = 0.112 - object_manual_offset_downToGrasp_redObj     # [m]
 
-
-
-# Gripper
-grasp_current_obj = 0.15      # [A]
-grasp_current_box = 0.25      # [A]
+grasp_current_box             = 0.25      # [A]
 box_grasp_gripper_open_pos_mm = 80.0      # [mm]
+box_grasp_floating_offset     = 0.08      # [m]
+
+box_move_readyPosition_right = np.array([0.55, -0.25, 1.2])     # desired position of "ee_finger_r1" from "base"  
+box_move_readyPosition_left  = np.array([0.55, 0.25, 1.2])      # desired position of "ee_finger_l1" from "base"  
+
+
+# Mobile Move
+moved_distance_to_back  = -0.7    # [m]
+desired_yaw_deg_to_turn = -176    # [deg], (+): CCW, (-): CW
+
+
+# Vision for Shelf
+vision_record_duration_shelfDistance = 5.0   # [sec]
+offset_shelf_distance = 0.45                 # [m]
+
+
+# Gripper: current control 
 gripper_open_ampere = -0.1    # [A]  
 gripper_close_ampere = 0.1    # [A]
 
 
-
-# ROI setting [Pixel Origin: (0,0) = 왼쪽 위 꼭짓점]
-width = 640
-height = 480
-
+# ------------------------------------
+# ROI setting 
+# Pixel Origin: (0,0) = 왼쪽 위 꼭짓점
+# ------------------------------------
 # table까지 거리를 잴 때 사용하는 ROI (Posture: PACK_POS)
-pixel_roi_x_tableDistance = [140, width - 140] 
-pixel_roi_y_tableDistance = [320, height]    
+pixel_roi_x_tableDistance = [280, ysw.D435I_PIXEL_WIDTH - 280/2.0] 
+pixel_roi_y_tableDistance = [320, ysw.D435I_PIXEL_HEIGHT]    
 
 # table위 물체 detection에 사용하는 ROI (Posture: DEMO_BASIC_POS_260826)
 pixel_roi_x_tableTop = None
-# pixel_roi_y_tableTop = [150, height]
-pixel_roi_y_tableTop = [150, height - 50]
+pixel_roi_y_tableTop = [150, ysw.D435I_PIXEL_HEIGHT - 50]
 
-# 박스를 grasp하고, 180도 돌아서 shelf까지 갈 때 사용하는 ROI 
-pixel_roi_x_shelfDistance = [130, width - 130]      
-pixel_roi_y_shelfDistance = [200, height]    
+# # 박스를 grasp하고, 180도 돌아서 shelf까지 갈 때 사용하는 ROI 
+pixel_roi_x_shelfDistance = [130, ysw.D435I_PIXEL_WIDTH - 130]      
+pixel_roi_y_shelfDistance = [200, ysw.D435I_PIXEL_HEIGHT ]    
+
 
 
 
@@ -210,68 +219,22 @@ ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_m
 # ==========================================================================================================
 # [Vision] Check the Distance to Table
 
-# Get the Distance of Center Pixel 
-# Table distance is approximated as the depth of center pixel
+# Get the Distance of Center Pixel of ROI
+# Table distance is approximated as the depth of center pixel of ROI
 # ==========================================================================================================
 ysw.print_demoStep(step=3, text="(Vision) Check the distance to Table")
 
-record_duration = vision_record_duration_tableDistance      # [sec]
-distance_list = []
+depth_to_table_avg = ysw.measure_depth_of_roi_center(    
+    depthCamObj=d435i,
+    pixel_roi_x=pixel_roi_x_tableDistance,
+    pixel_roi_y=pixel_roi_y_tableDistance,
+    record_duration=vision_record_duration_tableDistance,
+    verbose=True
+)
 
-d435i.startPipeline()
-
-try:
-    start_time = time.time()
-    
-    while True:
-        elapsed_time = time.time() - start_time
-        
-        if elapsed_time >= record_duration:
-            break
-        
-        color_frame, depth_frame = d435i.getRawFrames()
-
-        if color_frame is None or depth_frame is None:
-            continue
-
-        color_image, depth_image = d435i.frameToImage(color_frame, depth_frame)
-        h, w, _ = color_image.shape
-        
-        # ROI center pixel in full image coordinate
-        if pixel_roi_x_tableDistance is None:
-            x_min = 0
-            x_max = w
-        else:
-            x_min, x_max = pixel_roi_x_tableDistance
-            x_min = int(np.clip(x_min, 0, w - 1))
-            x_max = int(np.clip(x_max, 0, w))
-
-        if pixel_roi_y_tableDistance is None:
-            y_min = 0
-            y_max = h
-        else:
-            y_min, y_max = pixel_roi_y_tableDistance
-            y_min = int(np.clip(y_min, 0, h - 1))
-            y_max = int(np.clip(y_max, 0, h))
-            
-        x_roi_center = (x_min + x_max) // 2
-        y_roi_center = (y_min + y_max) // 2
-
-        distance = d435i.getDepth(depth_frame, (x_roi_center, y_roi_center))   # unit = [m]
-        distance_list.append(distance)
-        print(f"Table Distance: {distance:.3f} [m]",)
-
-finally:
-    d435i.stopPipeline()
-    d435i.destroyAllWindows()
-    
-
-# Average Distance
-distance_avg = np.mean(distance_list)
-print(f"\nTable Average Distance: {distance_avg} [m]")
-
-moved_distance_to_table = distance_avg - offset_table_distance
+moved_distance_to_table = depth_to_table_avg - offset_table_distance
 print(f"moved_distance_to_table: {moved_distance_to_table} [m]")
+
 
 
 # ==========================================================================================================
@@ -305,7 +268,7 @@ ysw.mobile_linear_distance(
 # ==========================================================================================================
 ysw.print_demoStep(step=6, text="(Vision) Black Box Detection")
 
-result_blackBox = check_colored_box_and_set_grasp_arm(
+result_blackBox = fn.check_colored_box_and_set_grasp_arm(
     depthCamObj=d435i,
     boxColor="black",
     hsv_mask=ysw.HSV_MASK_BLACK_BOX,
@@ -328,7 +291,7 @@ grasp_arm_blackObj = result_blackBox["grasp_arm"]
 # ==========================================================================================================
 ysw.print_demoStep(step=7, text="(Vision) Black Objects Detection")
 
-result_blackObj = check_colored_objects_sorted_by_center(
+result_blackObj = fn.check_colored_objects_sorted_by_center(
     depthCamObj=d435i,
     objectColor="black",
     hsv_mask=ysw.HSV_MASK_BLACK_BOX,
@@ -340,7 +303,7 @@ result_blackObj = check_colored_objects_sorted_by_center(
     pixel_roi_y=pixel_roi_y_tableTop,
     max_match_distance_pixel=40.0,
     min_rank_sample_ratio=0.4,
-    min_rank_num_samples=50,
+    min_rank_num_samples=20,
     verbose=True,
 )
 
@@ -365,7 +328,7 @@ for obj_idx, blackObj_sample_avg in enumerate(blackObj_sample_avg_list):
     print(f"# Compute IK for Black Object {obj_idx}")
     print(f"# ==================================================")
     
-    black_target_result = compute_IK_for_colored_object_and_box(
+    black_target_result = fn.compute_IK_for_colored_object_and_box(
         robot=robot,
         objectColor=f"black_{obj_idx}",
         object_sample_avg=blackObj_sample_avg,
@@ -375,13 +338,14 @@ for obj_idx, blackObj_sample_avg in enumerate(blackObj_sample_avg_list):
         object_manual_offset_downToGrasp=object_manual_offset_downToGrasp_blackObj,
         object_pregrasp_z_offset=object_pregrasp_z_offset,
         object_grasp_x_offset=object_grasp_x_offset, 
-        box_grasp_z_offset=box_grasp_z_offset,
         box_grasp_x_offset=box_grasp_x_offset,
         box_grasp_y_offset=box_grasp_y_offset - 0.01,       # manual
+        box_grasp_z_offset=box_grasp_z_offset,
         use_median=False,
         gripper_z_offset=ysw.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER,
-        verbose=True,
+        verbose=False,
     )
+    
     black_target_result_list.append(black_target_result)
 
 
@@ -400,7 +364,7 @@ for obj_idx, black_target_result in enumerate(black_target_result_list):
     print(f"# Pick and Place Black Object {obj_idx}")
     print(f"# ==================================================")
 
-    rv = pick_object_and_place_to_box(
+    rv = fn.pick_object_and_place_to_box(
         robot=robot,
         gripper=gripper,
         target_result=black_target_result,
@@ -410,7 +374,7 @@ for obj_idx, black_target_result in enumerate(black_target_result_list):
         position_control_minimum_time=position_control_minimum_time,
         control_hold_time=0.5,
         fix_torso=True,
-        verbose=True,
+        verbose=False,
     )
 
     if rv is False:
@@ -434,7 +398,7 @@ ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_m
 # ==========================================================================================================
 ysw.print_demoStep(step=11, text="(Vision) Red Box Detection")
 
-result_redBox = check_colored_box_and_set_grasp_arm(
+result_redBox = fn.check_colored_box_and_set_grasp_arm(
     depthCamObj=d435i,
     boxColor="red",
     hsv_mask=ysw.HSV_MASK_RED_BOX,
@@ -457,7 +421,7 @@ grasp_arm_redObj = result_redBox["grasp_arm"]
 # ==========================================================================================================
 ysw.print_demoStep(step=12, text="(Vision) Red Objects Detection")
 
-result_redObj = check_colored_objects_sorted_by_center(
+result_redObj = fn.check_colored_objects_sorted_by_center(
     depthCamObj=d435i,
     objectColor="red",
     hsv_mask=ysw.HSV_MASK_RED,
@@ -469,7 +433,7 @@ result_redObj = check_colored_objects_sorted_by_center(
     pixel_roi_y=pixel_roi_y_tableTop,
     max_match_distance_pixel=40.0,
     min_rank_sample_ratio=0.4,
-    min_rank_num_samples=50,
+    min_rank_num_samples=20,
     verbose=True,
 )
 
@@ -494,7 +458,7 @@ for obj_idx, redObj_sample_avg in enumerate(redObj_sample_avg_list):
     print(f"# Compute IK for Red Object {obj_idx}")
     print(f"# ==================================================")
     
-    red_target_result = compute_IK_for_colored_object_and_box(
+    red_target_result = fn.compute_IK_for_colored_object_and_box(
         robot=robot,
         objectColor=f"red_{obj_idx}",
         object_sample_avg=redObj_sample_avg,
@@ -504,13 +468,14 @@ for obj_idx, redObj_sample_avg in enumerate(redObj_sample_avg_list):
         object_manual_offset_downToGrasp=object_manual_offset_downToGrasp_redObj,
         object_pregrasp_z_offset=object_pregrasp_z_offset,
         object_grasp_x_offset=object_grasp_x_offset - 0.001, # Manual 
-        box_grasp_z_offset=box_grasp_z_offset - 0.008,       # Manual
         box_grasp_x_offset=box_grasp_x_offset - 0.005,       # Manual
         box_grasp_y_offset=box_grasp_y_offset,
+        box_grasp_z_offset=box_grasp_z_offset - 0.008,       # Manual
         use_median=False,
         gripper_z_offset=ysw.GRIPPER_Z_OFFSET_FROM_LINK_EE_FINGER,
-        verbose=True,
+        verbose=False,
     )
+    
     red_target_result_list.append(red_target_result)
 
 
@@ -529,7 +494,7 @@ for obj_idx, red_target_result in enumerate(red_target_result_list):
     print(f"# Pick and Place Red Object {obj_idx}")
     print(f"# ==================================================")
 
-    rv = pick_object_and_place_to_box(
+    rv = fn.pick_object_and_place_to_box(
         robot=robot,
         gripper=gripper,
         target_result=red_target_result,
@@ -539,7 +504,7 @@ for obj_idx, red_target_result in enumerate(red_target_result_list):
         position_control_minimum_time=position_control_minimum_time,
         control_hold_time=0.5,
         fix_torso=True,
-        verbose=True,
+        verbose=False,
     )
 
     if rv is False:
@@ -564,7 +529,7 @@ ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_m
 ysw.print_demoStep(step=16, text="(Pick Boxes) grasp outer side and slightly lift [Black & Red] Boxes")
 
 # Black Box Grasp and lift
-rv = grasp_box_outerside_and_lift(
+rv = fn.grasp_box_outerside_and_lift(
     robot=robot,
     gripper=gripper,
     target_result=black_target_result_list[0],
@@ -574,11 +539,11 @@ rv = grasp_box_outerside_and_lift(
     position_control_minimum_time=position_control_minimum_time,
     control_hold_time=0.5,
     fix_torso=True,
-    verbose=True,
+    verbose=False,
 )
 
 # Red Box Grasp an lift
-rv = grasp_box_outerside_and_lift(
+rv = fn.grasp_box_outerside_and_lift(
     robot=robot,
     gripper=gripper,
     target_result=red_target_result_list[0],
@@ -588,7 +553,7 @@ rv = grasp_box_outerside_and_lift(
     position_control_minimum_time=position_control_minimum_time,
     control_hold_time=0.5,
     fix_torso=True,
-    verbose=True,
+    verbose=False,
 )
 
 
@@ -609,7 +574,7 @@ ysw.positionCtrl_joint_22dof(robot, desired_pos, minimum_time=position_control_m
 ysw.print_demoStep(step=18, text="(Posture) Box-move-to-shelf Ready Posture")
 
 # For Black Box
-rv = move_ee_to_box_lift_ready_pose(
+rv = fn.move_ee_to_box_lift_ready_pose(
     robot=robot,
     target_result=black_target_result_list[0],
     pos_right=box_move_readyPosition_right,      # manual setting
@@ -621,7 +586,7 @@ rv = move_ee_to_box_lift_ready_pose(
 )
 
 # For Red Box
-rv = move_ee_to_box_lift_ready_pose(
+rv = fn.move_ee_to_box_lift_ready_pose(
     robot=robot,
     target_result=red_target_result_list[0],
     pos_right=box_move_readyPosition_right,      # manual setting
@@ -639,8 +604,6 @@ rv = move_ee_to_box_lift_ready_pose(
 # ==========================================================================================================
 ysw.print_demoStep(step=19, text="(Mobile) Move Backward slightly")
 
-moved_distance_to_back = -0.7       # manually changed
-
 ysw.mobile_linear_distance(
     robot,
     distance_m=moved_distance_to_back,
@@ -657,11 +620,9 @@ time.sleep(1)
 # ==========================================================================================================
 ysw.print_demoStep(step=20, text="(Mobile) Turn Right 180 degree")
 
-desired_yaw_deg = -176                   # Unit: [deg], (+): CCW, (-): CW
-
 ysw.mobile_turn_inplace(
     robot,
-    angle_deg=desired_yaw_deg, 
+    angle_deg=desired_yaw_deg_to_turn, 
     max_yaw_vel=0.6,
     yaw_accel=1.5,
     tolerance_deg=1.0
@@ -675,87 +636,16 @@ ysw.mobile_turn_inplace(
 # ==========================================================================================================
 ysw.print_demoStep(step=21, text="(Vision) Check the distance to shelf")
 
-record_duration = vision_record_duration_shelfDistance      # [sec]
-
-distance_list = []
-distance_median_list = []
-distance_min_list = []
-
-rv = d435i.startPipeline()
-if rv is False:
-    raise RuntimeError("[D435i] Failed to start pipeline.")
-
-try:
-    start_time = time.time()
-
-    while True:
-        elapsed_time = time.time() - start_time
-
-        if elapsed_time >= record_duration:
-            break
-
-        color_frame, depth_frame = d435i.getRawFrames()
-
-        if color_frame is None or depth_frame is None:
-            continue
-
-        color_image, depth_image = d435i.frameToImage(color_frame, depth_frame)
-
-        if color_image is None or depth_image is None:
-            continue
-
-        nearest_depth_result = get_nearest_depth_avg_in_roi(
-            depth_frame=depth_frame,
-            pixel_roi_x=pixel_roi_x_shelfDistance,
-            pixel_roi_y=pixel_roi_y_shelfDistance,
-            nearest_ratio=0.05,      # 가장 가까운 5%
-            min_num_points=30,       # 최소 30개 pixel 평균
-            max_valid_depth=3.0,     # 필요하면 2.0 [m] 이런 식으로 제한 가능
-        )
-
-        if nearest_depth_result is None:
-            print("[WARNING] No valid depth in ROI.")
-            continue
-
-        nearest_depth_avg = nearest_depth_result["nearest_depth_avg"]
-        nearest_depth_median = nearest_depth_result["nearest_depth_median"]
-        nearest_depth_min = nearest_depth_result["nearest_depth_min"]
-
-        distance_list.append(nearest_depth_avg)
-        distance_median_list.append(nearest_depth_median)
-        distance_min_list.append(nearest_depth_min)
-
-        print(
-            f"Table Distance nearest_avg: {nearest_depth_avg:.3f} [m], "
-            f"median: {nearest_depth_median:.3f} [m], "
-            f"min: {nearest_depth_min:.3f} [m], "
-            f"used: {nearest_depth_result['num_used_depth']}, "
-            f"valid: {nearest_depth_result['num_valid_depth']}"
-        )
-
-finally:
-    d435i.stopPipeline()
-    d435i.destroyAllWindows()
-
-# ------------------
-# Average Distance
-#-------------------
-if len(distance_list) == 0:
-    raise RuntimeError("[ERROR] No valid table distance was measured.")
-
-distance_avg = float(np.mean(distance_list))
-distance_median = float(np.median(distance_list))
-distance_std = float(np.std(distance_list))
-
-print("\n========== Shelf Distance Result ==========")
-print(f"num_samples           : {len(distance_list)}")
-print(f"Shelf Average Distance: {distance_avg:.4f} [m]")
-print(f"Shelf Median Distance : {distance_median:.4f} [m]")
-print(f"Shelf Distance Std    : {distance_std:.4f} [m]")
-
-moved_distance_to_shelf = distance_avg - offset_shelf_distance
-
-print(f"\noffset_shelf_distance : {offset_shelf_distance:.4f} [m]")
+shelf_distance_result = fn.measure_distance_by_nearest_depth_in_roi(
+    depthCamObj=d435i,
+    pixel_roi_x=pixel_roi_x_shelfDistance,
+    pixel_roi_y=pixel_roi_y_shelfDistance,
+    record_duration=vision_record_duration_shelfDistance,
+    nearest_ratio=0.05,      # 가장 가까운 5%
+    min_num_points=30,       # 최소 30개 pixel 평균
+    max_valid_depth=3.0,     # 필요하면 2.0 [m] 이런 식으로 제한 가능
+)
+moved_distance_to_shelf = shelf_distance_result["distance_avg"] - offset_shelf_distance
 print(f"moved_distance_to_shelf: {moved_distance_to_shelf:.4f} [m]")
 
 
@@ -804,7 +694,6 @@ time.sleep(1)
 # ==========================================================================================================
 ysw.print_demoStep(step=24, text="(Mobile) Move Backward slightly and Turn Left 180 degree")
 
-moved_distance_to_back = -0.7
 ysw.mobile_linear_distance(
     robot,
     distance_m=moved_distance_to_back,
@@ -814,10 +703,9 @@ ysw.mobile_linear_distance(
 )
 time.sleep(1)
 
-desired_yaw_deg = +176                   # Unit: [deg], (+): CCW, (-): CW
 ysw.mobile_turn_inplace(
     robot,
-    angle_deg=desired_yaw_deg, 
+    angle_deg=(-1.0)*desired_yaw_deg_to_turn, 
     max_yaw_vel=0.6,
     yaw_accel=1.5,
     tolerance_deg=1.0

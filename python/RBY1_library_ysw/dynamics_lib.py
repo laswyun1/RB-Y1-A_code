@@ -167,7 +167,8 @@ def make_HT(rotMat: np.ndarray, translation: list[float]) -> np.ndarray:
 def get_FK(
     robot,
     reference_link: str,
-    target_link: str
+    target_link: str,
+    verbose=True
 ):
     """
     Get current pose of target_link with respect to reference_link.
@@ -256,14 +257,14 @@ def get_FK(
         "rotation": rotMat,     # [rad]
         "rpy": rpy              # [rad]
     }
-
-    print("[Result]\n")
-    print("T:")
-    print(T_ref_target)
-    print("\n")
-    print(f"position [m]: {pos}")
-    print(f"rpy [rad]: {rpy}")
-    print(f"rpy [deg]: {rpy * RI.RAD2DEG}")
+    if (verbose == True):
+        print("[Result]\n")
+        print("T:")
+        print(T_ref_target)
+        print("\n")
+        print(f"position [m]: {pos}")
+        print(f"rpy [rad]: {rpy}")
+        print(f"rpy [deg]: {rpy * RI.RAD2DEG}")
 
     UTIL.print_end_title(f"FK of '{target_link}' from '{reference_link}' Ends")
     return result

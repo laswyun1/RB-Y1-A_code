@@ -749,7 +749,7 @@ def compute_IK_for_colored_object_and_box(
     # ------------------------------------------------------------
     # 3. Get T_SH: base -> link_head_2
     # ------------------------------------------------------------
-    fk_SH = ysw.get_FK(robot, "base", "link_head_2")
+    fk_SH = ysw.get_FK(robot, "base", "link_head_2", verbose=False)
 
     if fk_SH is None:
         raise RuntimeError("Failed to get FK: base -> link_head_2")
