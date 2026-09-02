@@ -68,11 +68,11 @@ def initialize(mode: str, address: str, model: str, power: str=".*", servo: str=
     """ 
     UTIL.print_start_title("Initialization Starts")
     
-    # 1.Create Robot Object
+    # 1. Create Robot Object
     robot = rby.create_robot(address, model)
     
     if (option in (RI.CONNECT_ONLY, RI.CONNECT_AND_POWER)):
-        # 2.Connect to Robot
+        # 2. Connect to Robot
         if not robot.connect():                                     # Connect
             logging.error("Failed to connect to the Robot")
             return None
@@ -80,7 +80,24 @@ def initialize(mode: str, address: str, model: str, power: str=".*", servo: str=
         time.sleep(0.1)
     
     if (option == RI.CONNECT_AND_POWER):
-        # 3.Power ON
+        # 3. If the robot in "Fault", Reset of CM is needed 
+        if robot.get_control_manager_state().state in [          # CM Check (Case 1: Fault state)
+            rby.ControlManagerState.State.MajorFault, 
+            rby.ControlManagerState.State.MinorFault
+        ]:
+            if not robot.reset_fault_control_manager():                 # CM Reset
+                logging.error("Failed to Reset the Control Manager")
+                return None
+            logging.info("SUCCESS: Reset the Control Manager!")
+            time.sleep(0.1)
+            
+            if not robot.disable_control_manager():                     # CM Disable (Not necessary)
+                logging.error("Failed to Disable the Control Manager")
+                return None
+            logging.info("SUCCESS: Disable the Control Manager!")
+            time.sleep(0.1)
+            
+        # 4. Power ON
         if not robot.is_power_on(power):                            # Power Check
             if not robot.power_on(power):                           # Power ON
                 logging.error("Failed to Power ON")
@@ -88,7 +105,7 @@ def initialize(mode: str, address: str, model: str, power: str=".*", servo: str=
         logging.info("SUCCESS: Power ON the Robot!")
         time.sleep(0.1)
 
-        # 4.Servo ON
+        # 5. Servo ON
         if not robot.is_servo_on(servo):                            # Servo Check
             if not robot.servo_on(servo):                           # Servo ON
                 logging.error("Failed to Servo ON")
@@ -96,30 +113,17 @@ def initialize(mode: str, address: str, model: str, power: str=".*", servo: str=
         logging.info("SUCCESS: Servo ON the Robot!")
         time.sleep(0.1)
     
-        # 5.Reset Control Manager
-        if robot.get_control_manager_state().state in [             # CM Check
-            rby.ControlManagerState.State.MajorFault, 
-            rby.ControlManagerState.State.MinorFault
-        ]:
-            if not robot.reset_fault_control_manager():             # CM Reset
-                logging.error("Failed to Reset the Control Manager")
+        # 6. Enable Control Manager
+        if not robot.enable_control_manager(unlimited_mode_enabled=False):          # CM Enable without Unlimit
+            logging.error("Failed to Enable the Control Manager without Unlimit")
+            if not robot.enable_control_manager(unlimited_mode_enabled=True):       # CM Enable with Unlimit
+                logging.error("Failed to Enable the Control Manager with Unlimit")
                 return None
-            # After the fault, enable/disable CM is not working without "unlimited_mode_enabled=True"
-            if not robot.enable_control_manager(unlimited_mode_enabled=True):       # Essential for Reinitialize from Fault
-                logging.error("Failed to Unlimit the Control Manager after Fault")
-                return None
-    
-            logging.info("SUCCESS: Reset the Control Manager!")
-            time.sleep(0.1)
-    
-        # 6.Enable Control Manager
-        if not robot.enable_control_manager():                      # CM Enable
-            logging.error("Failed to Enable the Control Manager")
-            return None
-        logging.info("SUCCESS: Enable the Control Manager!")
-        time.sleep(0.1)
+            logging.info("SUCCESS: Enable the Control Manager with Unlimit!")
+        logging.info("SUCCESS: Enable the Control Manager without Unlimit!")
+        time.sleep(0.1) 
         
-        # 7.Enable Grippers (Only for UPC mode)
+        # 7. Enable Grippers (Only for UPC mode)
         if mode == RI.MODE_DIRECT_UPC:
             if not robot.set_tool_flange_output_voltage("right", RI.TOOL_FLANGE_VOLTAGE_ON):   # Power ON R-gripper
                 logging.error("Failed to Enable the Right Gripper")
@@ -132,7 +136,83 @@ def initialize(mode: str, address: str, model: str, power: str=".*", servo: str=
         
     UTIL.print_end_title("Intialization is Done")
     return robot
+
+
+
+def initialize_unlimit(mode: str, address: str, model: str, power: str=".*", servo: str=".*", option: int=0) -> Union[rby.Robot_A, rby.Robot_M, rby.Robot_UB, None]:
+    """
+    Initialize with Unlimit control manager.
+    When the robot operation is not accurate, use this function to reinitialize the robot.
+    
+    [Ex] robot = ysw.initialize_unlimit(robotConfig.mode, robotConfig.address, robotConfig.model, option=RI.CONNECT_AND_POWER)
+    """ 
+    UTIL.print_start_title("Initialization Starts")
+    
+    # 1. Create Robot Object
+    robot = rby.create_robot(address, model)
+    
+    if (option in (RI.CONNECT_ONLY, RI.CONNECT_AND_POWER)):
+        # 2. Connect to Robot
+        if not robot.connect():                                     # Connect
+            logging.error("Failed to connect to the Robot")
+            return None
+        logging.info("SUCCESS: Connected to the Robot!")
+        time.sleep(0.1)
+    
+    if (option == RI.CONNECT_AND_POWER):
+        # 3. If the robot in "Fault", Reset of CM is needed 
+        if robot.get_control_manager_state().state in [          # CM Check (Case 1: Fault state)
+            rby.ControlManagerState.State.MajorFault, 
+            rby.ControlManagerState.State.MinorFault
+        ]:
+            if not robot.reset_fault_control_manager():                 # CM Reset
+                logging.error("Failed to Reset the Control Manager")
+                return None
+            logging.info("SUCCESS: Reset the Control Manager!")
+            time.sleep(0.1)
+            
+            if not robot.disable_control_manager():                     # CM Disable (Not necessary)
+                logging.error("Failed to Disable the Control Manager")
+                return None
+            logging.info("SUCCESS: Disable the Control Manager!")
+            time.sleep(0.1)
+            
+        # 4. Power ON
+        if not robot.is_power_on(power):                            # Power Check
+            if not robot.power_on(power):                           # Power ON
+                logging.error("Failed to Power ON")
+                return None
+        logging.info("SUCCESS: Power ON the Robot!")
+        time.sleep(0.1)
+
+        # 5. Servo ON
+        if not robot.is_servo_on(servo):                            # Servo Check
+            if not robot.servo_on(servo):                           # Servo ON
+                logging.error("Failed to Servo ON")
+                return None
+        logging.info("SUCCESS: Servo ON the Robot!")
+        time.sleep(0.1)
+    
+        # 6. Enable Control Manager
+        if not robot.enable_control_manager(unlimited_mode_enabled=True):       # CM Enable with Unlimit
+            logging.error("Failed to Enable the Control Manager with Unlimit")
+            return None
+        logging.info("SUCCESS: Enable the Control Manager with Unlimit!")
+        time.sleep(0.1) 
         
+        # 7. Enable Grippers (Only for UPC mode)
+        if mode == RI.MODE_DIRECT_UPC:
+            if not robot.set_tool_flange_output_voltage("right", RI.TOOL_FLANGE_VOLTAGE_ON):   # Power ON R-gripper
+                logging.error("Failed to Enable the Right Gripper")
+                return None
+            if not robot.set_tool_flange_output_voltage("left", RI.TOOL_FLANGE_VOLTAGE_ON):    # Power ON L-gripper
+                logging.error("Failed to Enable the Left Gripper")
+                return None
+            logging.info("SUCCESS: Enable the Grippers!")
+            time.sleep(0.1)
+        
+    UTIL.print_end_title("Intialization is Done")
+    return robot
         
         
 def powerOFF(robot, robotConfig: RobotConfig) -> bool:
