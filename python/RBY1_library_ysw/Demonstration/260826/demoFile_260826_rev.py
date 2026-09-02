@@ -169,7 +169,7 @@ ysw.print_demoStep(step=1, text="Initialize")
 # Robot Initialization
 # ----------------------------------------------------------
 robotConfig = ysw.setRobotConfig(ysw.MODE_DIRECT_UPC, ysw.MODEL_A)          # For Real Robot + UPC
-robot = ysw.initialize(robotConfig.mode, robotConfig.address, robotConfig.model, option=ysw.CONNECT_AND_POWER)
+robot = ysw.initialize_unlimit(robotConfig.mode, robotConfig.address, robotConfig.model, option=ysw.CONNECT_AND_POWER)
 if (robot != None):
     model = robot.model()
 time.sleep(1)
