@@ -469,7 +469,7 @@ DXL_D_GAIN_POSCTRL_DEFAULT              = 4000          # By RainbowRobotics
 DXL_P_GAIN_POSCTRL                      = 500
 DXL_I_GAIN_POSCTRL                      = 0
 DXL_D_GAIN_POSCTRL                      = 2000
-DXL_PID_GAIN_LIMIT                      = 5000          # Manually setting for hazard (you can change this)
+DXL_PID_GAIN_LIMIT                      = 10000          # Manually setting for hazard (you can change this)
 
 DEMO_GRIP_CURRENT_R             = 0.8
 DEMO_GRIP_CURRENT_L             = 0.6

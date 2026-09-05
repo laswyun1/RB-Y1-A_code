@@ -20,6 +20,9 @@ import logging
 from dynamixel_sdk import PortHandler, PacketHandler
 from typing import Optional
 import time
+import matplotlib.pyplot as plt
+import numpy as np
+from IPython.display import display
 
 
 # =============================================================================
@@ -308,7 +311,7 @@ class Gripper:
             
             
             
-    def read_current_ampere(self, dxl_id: int) -> Optional[float]:    
+    def read_current_ampere(self, dxl_id: int, verbose=True) -> Optional[float]:    
         """
             Read Current value (unit = A) 
             [Ex] gripper.read_current_ampere(dxl_id=ysw.GRIPPER_ID_R)
@@ -328,8 +331,17 @@ class Gripper:
             logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
             return None
         else:
-            current_A = float(val) * RI.DXL_AMPERE_PER_UNIT 
-            logging.info(f"SUCCESS: [DXL ID:{dxl_id}] current = {current_A}A")
+            # Transform to signed 16-bit
+            signed_val = val
+    
+            if signed_val >= 2**15:
+                signed_val -= 2**16
+                
+            current_A = float(signed_val) * RI.DXL_AMPERE_PER_UNIT 
+    
+            if (verbose == True):
+                logging.info(f"SUCCESS: [DXL ID:{dxl_id}] current = {current_A}A")
+                
             return current_A     # [A]
         
         
@@ -500,10 +512,10 @@ class Gripper:
         """      
         current_ampere_revised = current_ampere
         
-        if (current_ampere > 0.6725):
-            logging.info(f"[DXL ID:%d] Current MUST be less than 672.5mA")
-            logging.info(f"[DXL ID:%d] Thus, Maximum Currentt(672.5mA) is applied")
-            current_ampere_revised = 0.6725
+        if (current_ampere > RI.DXL_CURRENT_LIMIT_MAX_A_RAINBOW):
+            logging.info(f"[DXL ID:%d] Current MUST be less than {RI.DXL_CURRENT_LIMIT_MAX_A_RAINBOW}A")
+            logging.info(f"[DXL ID:%d] Thus, Maximum Current({RI.DXL_CURRENT_LIMIT_MAX_A_RAINBOW}A) is applied")
+            current_ampere_revised = RI.DXL_CURRENT_LIMIT_MAX_A_RAINBOW
             
         current_value = int(current_ampere_revised / RI.DXL_AMPERE_PER_UNIT)
         
@@ -535,7 +547,15 @@ class Gripper:
             
             Return: X
         """    
-        current_value = int(current_ampere / RI.DXL_AMPERE_PER_UNIT)
+        
+        current_ampere_revised = current_ampere
+        
+        if (current_ampere > RI.DXL_CURRENT_LIMIT_MAX_A_RAINBOW):
+            logging.info(f"[DXL ID:%d] Current MUST be less than {RI.DXL_CURRENT_LIMIT_MAX_A_RAINBOW}A")
+            logging.info(f"[DXL ID:%d] Thus, Maximum Current({RI.DXL_CURRENT_LIMIT_MAX_A_RAINBOW}A) is applied")
+            current_ampere_revised = RI.DXL_CURRENT_LIMIT_MAX_A_RAINBOW
+            
+        current_value = int(current_ampere_revised / RI.DXL_AMPERE_PER_UNIT)
         
         while True:
             dxl_comm_res, dxl_err = self.packet_hdlr.write2ByteTxRx(
@@ -544,16 +564,16 @@ class Gripper:
                 RI.DXL_ADDR_GOAL_CURRENT,
                 current_value
             )
+            
             if dxl_comm_res != RI.DXL_COMM_SUCCESS:
                 logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getTxRxResult(dxl_comm_res)))
-                time.sleep(0.5)
             elif dxl_err != RI.DXL_NO_ERROR:
                 logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
-                time.sleep(0.5)
             else:
                 logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Current [{current_ampere} A]")
-                time.sleep(0.5)
                 break
+            
+            time.sleep(0.1)
             print(f"[DXL ID]:{dxl_id} Retry...")
             
 
@@ -657,7 +677,7 @@ class Gripper:
             logging.error("Kp, Ki, Kd values cannot be less than 0")
             return False
         if (Kp > RI.DXL_PID_GAIN_LIMIT or Ki > RI.DXL_PID_GAIN_LIMIT or Kd > RI.DXL_PID_GAIN_LIMIT):     
-            logging.error("Kp, Ki, Kd values cannot exceed limit(=1000)")
+            logging.error(f"Kp, Ki, Kd values cannot exceed limit [{RI.DXL_PID_GAIN_LIMIT}]")
             return False
 
         dxl_comm_res, dxl_err = self.packet_hdlr.write2ByteTxRx(
@@ -1017,39 +1037,76 @@ class Gripper:
 # General Functions for Gripper
 # =============================================================================
 def sign(x):
-    if x > 0:       return 1.0
-    elif x < 0:     return -1.0
+    if x > 0.0:       return 1.0
+    elif x < 0.0:     return -1.0
     else:           return 0.0
     
 
-def trapezoidal_position_command(
+def trapezoidal_position_control(
     gripper,
     dxl_id,
-    start_pos_mm,
     target_pos_mm,
     current_ampere_mag=0.02,
-    v_max=20.0,      # mm/s
-    a_max=50.0,      # mm/s^2
-    dt=0.01,         # 100Hz
-    pos_tol=0.01,
-    vel_tol=0.01
+    v_max=20.0,      # [mm/s]
+    a_max=50.0,      # [mm/s^2]
+    dt=0.01,         # [sec], 100Hz
+    pos_tol=1.0,    # [mm]
+    vel_tol=1.0,    # [mm/s]
+    max_time=10.0,   # [sec]
 ):
     """
-        Trapezoidal trajectory generator.
+        Trapezoidal trajectory generation and control for gripper position command.
+        
+        실제 현재 gripper position을 read_position()으로 읽고,
+        그 위치에서 target_pos_mm까지 부드럽게 position command를 보냄.
 
         x     : commanded position [mm]
         v     : commanded velocity [mm/s]
         a     : commanded acceleration [mm/s^2]
 
         start_pos_mm  -> target_pos_mm 로 이동하면서
-        |v| <= v_max
-        |a| <= a_max
-        을 만족.
+            |v| <= v_max
+            |a| <= a_max
+        를 만족하도록 중간 position command를 계속 보냄.
+        
+        Return:
+            True  : target reached
+            False : failed or timeout
     """
+    
+    start_pos_mm = gripper.read_position(
+        dxl_id=dxl_id,
+        unit=RI.MM,
+        homing_use=True,
+        print_log=False,
+    )
+    if start_pos_mm is None:
+        logging.error(f"Failed to read gripper position. dxl_id={dxl_id}")
+        return False
+    
     x = float(start_pos_mm)
+    target_pos_mm = float(target_pos_mm)
+    
     v = 0.0
+    start_time = time.time()
+    
+    v_max = abs(float(v_max))
+    a_max = abs(float(a_max))
+    dt = float(dt)
+    
+    # For Safety
+    if v_max <= 0.0:    raise ValueError("v_max must be positive.")
+    if a_max <= 0.0:    raise ValueError("a_max must be positive.")
+    if dt <= 0.0:       raise ValueError("dt must be positive.")
+    
+    print(f"[Gripper Trapezoidal profile] start={x:.2f} mm -> target={target_pos_mm:.2f} mm")
     
     while True:
+        # Timeout check 
+        if time.time() - start_time > max_time:
+            logging.error("trapezoidal_position_command timeout.")
+            return False
+        
         # Remaining distance
         error = target_pos_mm - x
         
@@ -1057,31 +1114,61 @@ def trapezoidal_position_command(
         if abs(error) <= pos_tol and abs(v) <= vel_tol:
             x = target_pos_mm
             
-            gripper.current_based_position_control_linear(
+            rv = gripper.current_based_position_control_linear(
                 dxl_id,
                 current_ampere_mag=current_ampere_mag,
                 linear_pos=x
             )
-            break
+            
+            if rv is False:
+                logging.error("Failed to send final gripper command")
+                return False
+        
+            time.sleep(0.2)
+            
+            # 실제 위치 확인
+            actual_pos_mm = gripper.read_position(
+                dxl_id=dxl_id,
+                unit=RI.MM,
+                homing_use=True,
+                print_log=False,
+            )
+            
+            if actual_pos_mm is None:
+                logging.error("Failed to read final gripper position")
+                return False
+            
+            actual_error = target_pos_mm - actual_pos_mm
+            
+            print(
+                f"[Gripper Trapezoid Done] "
+                f"target={target_pos_mm:.2f} mm, "
+                f"actual={actual_pos_mm:.2f} mm, "
+                f"error={actual_error:.2f} mm"
+            )
+            
+            if abs(actual_error) <= pos_tol:
+                return True
+            else:
+                logging.info("Command finished, but actual position is not close enough.")
+                return False
+
+            
         
         # -------------------------------------------------
         # Trajectory Generator
         # -------------------------------------------------
         direction_to_goal = sign(error)
-        
-        # 현재 속도로부터 필요한 stopping distance
-        stopping_distance = (v**2) / (2.0 * a_max)
-        
-        # 현재 움직이는 방향
-        velocity_direction = sign(v)
+        velocity_direction = sign(v)                    # 현재 움직이는 방향
+        stopping_distance = (v**2) / (2.0 * a_max)      # 현재 속도로부터 필요한 stopping distance
         
         # 1. 목표 반대 방향으로 움직이고 있다면 먼저 감속
-        if velocity_direction != 0 and velocity_direction != direction_to_goal:
+        if velocity_direction != 0.0 and velocity_direction != direction_to_goal:
             a = -velocity_direction * a_max
 
         # 2. 이제 braking을 시작해야 할 경우
         elif abs(error) <= stopping_distance:
-            if velocity_direction != 0:
+            if velocity_direction != 0.0:
                 a = -velocity_direction * a_max
             else:
                 a = 0.0
@@ -1093,22 +1180,15 @@ def trapezoidal_position_command(
             else:
                 a = 0.0
 
-        # -------------------------------------------------
         # velocity update
-        # -------------------------------------------------
         v_new = v + a * dt
+        v_new = max(-v_max, min(v_max, v_new))      # velocity saturation
 
-        # velocity saturation
-        v_new = max(-v_max, min(v_max, v_new))
-
-        # -------------------------------------------------
         # position update
-        # -------------------------------------------------
-        # 좀 더 정확한 integration
         x_new = x + 0.5 * (v + v_new) * dt
 
         # 목표를 지나쳐버리는 numerical overshoot 방지
-        if (target_pos_mm - x) * (target_pos_mm - x_new) < 0:
+        if (target_pos_mm - x) * (target_pos_mm - x_new) < 0.0:
             x_new = target_pos_mm
             v_new = 0.0
 
@@ -1118,9 +1198,107 @@ def trapezoidal_position_command(
         # -------------------------------------------------
         # Dynamixel command
         # -------------------------------------------------
-        gripper.current_based_position_control_linear(
+        rv = gripper.current_based_position_control_linear(
             dxl_id,
             current_ampere_mag=current_ampere_mag,
             linear_pos=x
         )
+        
+        if rv is False:
+            logging.error("Failed to send gripper position command")
+        
         time.sleep(dt)
+
+
+def monitor_gripper_current(
+    gripper,
+    dxl_id,
+    duration_sec=None,
+    sample_dt=0.01,       # 100 Hz
+    title="Gripper Current Monitoring",
+    verbose=True,
+):
+    """
+    Dynamixel gripper current를 모니터링하고, 측정이 끝난 뒤 plot.
+    duration_sec 시간이 지나거나 Ctrl+C로 멈추면 마지막에 그래프를 그림.
+
+    Args:
+        gripper      : Gripper object
+        dxl_id       : Dynamixel ID
+        duration_sec : 측정 시간 [sec]. None이면 Ctrl+C까지 계속 측정
+        sample_dt    : sampling interval [sec]
+        plot_abs     : True이면 abs(current)도 같이 표시
+        title        : plot title
+        verbose      : If it is True, print the current values
+
+    Return:
+        result = {
+            "time": time_list,
+            "current": current_list,
+        }
+    """
+
+    time_list = []
+    current_list = []
+
+    start_time = time.time()
+
+    logging.info("Start current monitoring.")
+    logging.info("Press Ctrl+C to stop.")
+
+    try:
+        while True:
+            now = time.time()
+            elapsed = now - start_time
+
+            if duration_sec is not None and elapsed >= duration_sec:
+                break
+
+            current_A = gripper.read_current_ampere(
+                dxl_id=dxl_id,
+                verbose=verbose,
+            )
+
+            if current_A is not None:
+                time_list.append(elapsed)
+                current_list.append(current_A)
+
+            time.sleep(sample_dt)
+
+    except KeyboardInterrupt:
+        print("\n[INFO] Current monitoring stopped by user.")
+
+    result = {
+        "time": np.array(time_list),
+        "current": np.array(current_list),
+    }
+
+    logging.info("Current monitoring finished.")
+    logging.info(f"Num samples: {len(time_list)}")
+
+    if len(current_list) == 0:
+        print("[WARNING] No current data to plot.")
+        return result
+    
+    current_array = np.array(current_list)
+    time_array = np.array(time_list)
+
+    print(f"Current mean     : {np.mean(current_array):.4f} A")
+    print(f"Current max      : {np.max(current_array):.4f} A")
+    print(f"Current min      : {np.min(current_array):.4f} A")
+    print(f"Abs current max  : {np.max(np.abs(current_array)):.4f} A")
+
+    # -------------------------------------------------
+    # Plot after monitoring finished
+    # -------------------------------------------------
+    plt.figure(figsize=(10, 4))
+    plt.plot(time_array, current_array, label="current [A]")
+
+    plt.xlabel("Time [s]")
+    plt.ylabel("Current [A]")
+    plt.title(title)
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
+    return result
