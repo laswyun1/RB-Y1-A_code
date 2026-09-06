@@ -265,6 +265,11 @@ GRIPPER_DEBUG_POS = {"torso":     np.deg2rad([0.0, 80.0, -140.0,   60.0, 0.0,   
                      "left_arm":  np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0, -20.0, 0.0]),
                      "head":      np.deg2rad([0.0, 0.0])}
 
+GRIPPER_CURRENT_TEST_POS = {"torso":     np.deg2rad([0.0, 80.0, -140.0,   60.0, 0.0,   0.0]),
+                            "right_arm": np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0,  60.0, 0.0]),
+                            "left_arm":  np.deg2rad([0.0,  0.0,    0.0, -150.0, 0.0,  60.0, 0.0]),
+                            "head":      np.deg2rad([0.0, 0.0])}
+
 # =============================================================================
 # [260723] DEMO-specific 22-DoF Joint Position for (Head + Body) Postures 
 # =============================================================================
@@ -465,6 +470,11 @@ DXL_NO_ERROR                            = 0
 DXL_P_GAIN_POSCTRL_DEFAULT              = 800           # By RainbowRobotics
 DXL_I_GAIN_POSCTRL_DEFAULT              = 0             # By RainbowRobotics
 DXL_D_GAIN_POSCTRL_DEFAULT              = 4000          # By RainbowRobotics
+
+# Ziegler-Nichols method-based PID tuning experiment (From experiment, K_u=150, T_u=2/3)
+DXL_P_GAIN_POSCTRL_YSW                  = 120           # By YSW 
+DXL_I_GAIN_POSCTRL_YSW                  = 0             # By YSW
+DXL_D_GAIN_POSCTRL_YSW                  = 2500          # By YSW    (originally 100, but I set 2500 by experiment)
 
 DXL_P_GAIN_POSCTRL                      = 500
 DXL_I_GAIN_POSCTRL                      = 0
