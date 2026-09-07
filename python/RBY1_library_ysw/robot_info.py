@@ -428,6 +428,7 @@ GRIPPER_POS_ERROR_TOLERANCE             = 1       # Unit: mm  (Manually set)
 DXL_PROTOCOL_VERSION                    = 2.0
 DXL_BAUDRATE                            = 2000000
 
+DXL_ADDR_DRIVE_MODE                     = 10      # range: 0~13
 DXL_ADDR_OPERATING_MODE                 = 11      # 0: Current Control / 1: Velocity Control / 3: Position Control(default)
 DXL_ADDR_CURRENT_LIMIT                  = 38      # 0 ~ 1193
 DXL_ADDR_TORQUE_ENABLE                  = 64      # 0: Turn OFF(default) / 1: Turn ON
@@ -436,9 +437,13 @@ DXL_ADDR_D_GAIN_POSCTRL                 = 80      # default: 0      range: 0~16,
 DXL_ADDR_I_GAIN_POSCTRL                 = 82      # default: 0      range: 0~16,383
 DXL_ADDR_P_GAIN_POSCTRL                 = 84      # default: 800    range: 0~16,383
 DXL_ADDR_GOAL_CURRENT                   = 102
+DXL_ADDR_PROFILE_ACCELRATION            = 108     # acceleration of profile(velocity-based) or acceleartion time(time-based)       range: 0~32767
+DXL_ADDR_PROFILE_VELOCITY               = 112     # maximum velocity of profile(velocity-based) or total profile time(time-based)  range: 0~32767
 DXL_ADDR_GOAL_POSITION                  = 116   
+DXL_ADDR_MOVING_STATUS                  = 123     # 
 DXL_ADDR_PRESENT_CURRENT                = 126     # Unit: 2.69mA
 DXL_ADDR_PRESENT_POSITION               = 132     # Unit: 1-pulse(or Tick)
+DXL_ADDR_POSITION_TRAJECTORY            = 140
 
 DXL_CURRENT_CONTROL_MODE                = 0
 DXL_POSITION_CONTROL_MODE               = 3       # It only used for (0~4096) positive tick values (Not suited for RBY1)
@@ -448,6 +453,12 @@ DXL_CONTROL_MODE                        = [DXL_CURRENT_CONTROL_MODE,
                                            DXL_POSITION_CONTROL_MODE, 
                                            DXL_EXTENDED_POSITION_CONTROL_MODE,  
                                            DXL_CURRENT_BASED_POSITION_CONTROL_MODE]
+
+DXL_DRIVE_MODE_PROFILE_BIT                   = 2            # Bit index of Drive Mode(10) about Profile 
+DXL_DRIVE_MODE_VELOCITY_BASED_PROFILE_MASK   = 0b11111011
+DXL_DRIVE_MODE_TIME_BASED_PROFILE_MASK       = 0b00000100
+DXL_DRIVE_MODE_VELOCITY_BASED_PROFILE        = 0
+DXL_DRIVE_MODE_TIME_BASED_PROFILE            = 1
 
 DXL_TORQUE_DISABLE                      = 0
 DXL_TORQUE_ENABLE                       = 1

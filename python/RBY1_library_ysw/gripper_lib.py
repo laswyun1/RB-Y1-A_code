@@ -49,6 +49,8 @@ class Gripper:
         self.dxl_R_homing_LinearToTick = RI.GRIPPER_POS_SCALE_LINEAR_TO_TICK_R
         self.dxl_L_homing_LinearToTick = RI.GRIPPER_POS_SCALE_LINEAR_TO_TICK_L
         
+        self.command_time = None        # command input time (ex. position control)
+        
         
         
     #----------------------------------------------------------------------------
@@ -428,6 +430,143 @@ class Gripper:
             Kd = val
             logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Kd = {Kd}")
             return [Kp, Ki, Kd]
+        
+        
+
+    def read_position_trajectory(self, dxl_id: int) -> Optional[float]:  
+        """
+            Read position trajectory 
+            [Ex] gripper.read_position_trajectory(dxl_id=ysw.GRIPPER_ID_R)
+            
+            Return:
+                
+        """     
+        val, dxl_comm_res, dxl_err = self.packet_hdlr.read2ByteTxRx(
+            self.port_hdlr,
+            dxl_id,
+            RI.DXL_ADDR_POSITION_TRAJECTORY
+        )
+        if dxl_comm_res != RI.DXL_COMM_SUCCESS:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getTxRxResult(dxl_comm_res)))
+            return None
+        elif dxl_err != RI.DXL_NO_ERROR:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
+            return None
+        else:
+            position_trajectory = val
+            logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Position Trajectory = {position_trajectory}")
+            return position_trajectory       
+        
+        
+        
+    def read_moving_status(self, dxl_id: int, verbose=True) -> Optional[int]:  
+        """
+            Read Moving Status(123).
+            [Ex] gripper.read_moving_status(dxl_id=ysw.GRIPPER_ID_R)
+            
+            Return:
+                int value, 0~255 
+        """     
+        val, dxl_comm_res, dxl_err = self.packet_hdlr.read1ByteTxRx(
+            self.port_hdlr,
+            dxl_id,
+            RI.DXL_ADDR_MOVING_STATUS
+        )
+        if dxl_comm_res != RI.DXL_COMM_SUCCESS:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getTxRxResult(dxl_comm_res)))
+            return None
+        elif dxl_err != RI.DXL_NO_ERROR:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
+            return None
+        else:
+            moving_status = val & 0xFF
+            if verbose:
+                logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Moving Status = {moving_status}, binary=0b{moving_status:08b}")
+            return moving_status   
+        
+        
+
+    def read_drive_mode(self, dxl_id: int, verbose=True) -> Optional[int]:  
+        """
+            Read Drive Mode(10).
+        
+            [Ex] gripper.read_drive_mode(dxl_id=ysw.GRIPPER_ID_R)
+            
+            Return:
+                int value, 0~255
+        """     
+        val, dxl_comm_res, dxl_err = self.packet_hdlr.read1ByteTxRx(
+            self.port_hdlr,
+            dxl_id,
+            RI.DXL_ADDR_DRIVE_MODE
+        )
+        if dxl_comm_res != RI.DXL_COMM_SUCCESS:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getTxRxResult(dxl_comm_res)))
+            return None
+        elif dxl_err != RI.DXL_NO_ERROR:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
+            return None
+        else:
+            drive_mode = val & 0xFF
+            if verbose:
+                logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Drive Mode = {drive_mode}, binary=0b{drive_mode:08b}")
+            return drive_mode    
+        
+        
+    
+    def read_profile_acceleration(self, dxl_id: int, verbose=True) -> Optional[int]:  
+        """
+            Read Profile Acceleration(108).
+        
+            [Ex] gripper.read_profile_acceleration(dxl_id=ysw.GRIPPER_ID_R)
+            
+            Return:
+                int value, 0~32767
+        """     
+        val, dxl_comm_res, dxl_err = self.packet_hdlr.read4ByteTxRx(
+            self.port_hdlr,
+            dxl_id,
+            RI.DXL_ADDR_PROFILE_ACCELRATION
+        )
+        if dxl_comm_res != RI.DXL_COMM_SUCCESS:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getTxRxResult(dxl_comm_res)))
+            return None
+        elif dxl_err != RI.DXL_NO_ERROR:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
+            return None
+        else:
+            profile_acc = val 
+            if verbose:
+                logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Profile Acceleration = {profile_acc}")
+            return profile_acc 
+        
+        
+        
+    def read_profile_velocity(self, dxl_id: int, verbose=True) -> Optional[int]:  
+        """
+            Read Profile Velocity(112).
+        
+            [Ex] gripper.read_profile_velocity(dxl_id=ysw.GRIPPER_ID_R)
+            
+            Return:
+                int value, 0~32767
+        """     
+        val, dxl_comm_res, dxl_err = self.packet_hdlr.read4ByteTxRx(
+            self.port_hdlr,
+            dxl_id,
+            RI.DXL_ADDR_PROFILE_VELOCITY
+        )
+        if dxl_comm_res != RI.DXL_COMM_SUCCESS:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getTxRxResult(dxl_comm_res)))
+            return None
+        elif dxl_err != RI.DXL_NO_ERROR:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
+            return None
+        else:
+            profile_vel = val 
+            if verbose:
+                logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Profile Velocity = {profile_vel}")
+            return profile_vel 
          
          
     #----------------------------------------------------------------------------
@@ -727,6 +866,126 @@ class Gripper:
             return True
         
         
+    
+    def write_drive_mode(self, dxl_id: int, register_8bit: int) -> bool:        
+        """
+            Set Drive Mode(10)
+
+            Drive Mode is a 1-byte EEPROM register.
+            Torque should be OFF before writing this value.
+            
+            register_8bit:
+                Use binary literal, for example:
+                    0b00000000  # velocity-based profile
+                    0b00000100  # time-based profile
+            
+            [Ex] gripper.write_drive_mode(ysw.GRIPPER_ID_R, 0b00000100)
+            
+            Return: 
+                True: OK
+                False: Error
+        """  
+        drive_mode_value = int(register_8bit)
+        
+        if drive_mode_value < 0 or drive_mode_value > 255:
+            logging.error(f"Drive Mode should be 1-byte value. Current value = {drive_mode_value}")
+            return False
+        
+        dxl_comm_res, dxl_err = self.packet_hdlr.write1ByteTxRx(
+            self.port_hdlr,
+            dxl_id,
+            RI.DXL_ADDR_DRIVE_MODE,
+            drive_mode_value
+        )
+        if dxl_comm_res != RI.DXL_COMM_SUCCESS:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getTxRxResult(dxl_comm_res)))
+            return False
+        elif dxl_err != RI.DXL_NO_ERROR:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
+            return False
+        else:
+            logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Drive Mode: {format(register_8bit, '08b')}")
+            return True
+        
+        
+    
+    def write_profile_acceleration(self, dxl_id: int, profile_acc_or_accTime: int) -> bool:        
+        """
+            Set Profile Acceleration(108)
+            
+            If Drive mode is Velocity-based profile,    then write "profile_acc"       -> unit: [rev/min^2]
+            If Drive mode is Time-based profile,        then write "profile_accTime"   -> unit: [msec]      
+            
+            profile_acc_or_accTime: 4byte data (0~32767)
+            
+            [Ex] gripper.write_profile_acceleration(ysw.GRIPPER_ID_R, 1000)     # 1000[msec]
+            
+            Return: 
+                True:  OK
+                False: Error
+        """  
+        profile_acc_or_accTime = int(profile_acc_or_accTime)
+        
+        if profile_acc_or_accTime < 0 or profile_acc_or_accTime > 32767:
+            logging.error(f"Profile Acceleration should be 4-byte value. Current value = {profile_acc_or_accTime}")
+            return False
+        
+        dxl_comm_res, dxl_err = self.packet_hdlr.write4ByteTxRx(
+            self.port_hdlr,
+            dxl_id,
+            RI.DXL_ADDR_PROFILE_ACCELRATION,
+            profile_acc_or_accTime
+        )
+        if dxl_comm_res != RI.DXL_COMM_SUCCESS:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getTxRxResult(dxl_comm_res)))
+            return False
+        elif dxl_err != RI.DXL_NO_ERROR:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
+            return False
+        else:
+            logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Profile Acceleration(acc or accTime): {profile_acc_or_accTime}")
+            return True
+        
+        
+    
+    def write_profile_velocity(self, dxl_id: int, profile_vel_or_totalTime: int) -> bool:        
+        """
+            Set Profile Velocity(112)
+            
+            If Drive mode is Velocity-based profile,    then write "profile_vel"         -> unit: [rev/min^2]
+            If Drive mode is Time-based profile,        then write "profile_totalTime"   -> unit: [msec]      
+            
+            profile_vel_or_totalTime: 4byte data (0~32767)
+            
+            [Ex] gripper.write_profile_velocity(ysw.GRIPPER_ID_R, 2000)     # 2000[msec]
+            
+            Return: 
+                True:  OK
+                False: Error
+        """  
+        profile_vel_or_totalTime = int(profile_vel_or_totalTime)
+        
+        if profile_vel_or_totalTime < 0 or profile_vel_or_totalTime > 32767:
+            logging.error(f"Profile Velocity should be 4-byte value. Current value = {profile_vel_or_totalTime}")
+            return False
+        
+        dxl_comm_res, dxl_err = self.packet_hdlr.write4ByteTxRx(
+            self.port_hdlr,
+            dxl_id,
+            RI.DXL_ADDR_PROFILE_VELOCITY,
+            profile_vel_or_totalTime
+        )
+        if dxl_comm_res != RI.DXL_COMM_SUCCESS:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getTxRxResult(dxl_comm_res)))
+            return False
+        elif dxl_err != RI.DXL_NO_ERROR:
+            logging.error("[DXL ID:%d] Fail %s" % (dxl_id, self.packet_hdlr.getRxPacketError(dxl_err)))
+            return False
+        else:
+            logging.info(f"SUCCESS: [DXL ID:{dxl_id}] Set Profile Velocity(vel or totalTime): {profile_vel_or_totalTime}")
+            return True
+        
+        
         
     #----------------------------------------------------------------------------
     # Calculation Functions
@@ -745,6 +1004,7 @@ class Gripper:
         self, 
         dxl_id=None, 
         operation_mode=RI.DXL_CURRENT_CONTROL_MODE, 
+        drive_mode=RI.DXL_DRIVE_MODE_TIME_BASED_PROFILE,
         Kp=None,
         Ki=None, 
         Kd=None
@@ -789,8 +1049,30 @@ class Gripper:
             else:
                 logging.error("Invalid DXL Operation Mode")
                 return False
+            
+            # 4. Drive Mode - Profile
+            if (drive_mode in (RI.DXL_DRIVE_MODE_VELOCITY_BASED_PROFILE, RI.DXL_DRIVE_MODE_TIME_BASED_PROFILE)):
+                old_drive_mode = None
                 
-            # 4. Enable Torque mode
+                while (old_drive_mode is None):
+                    old_drive_mode = self.read_drive_mode(dxl_id, verbose=False)
+                    
+                    if old_drive_mode is None:
+                        logging.warning(f"[DXL ID:{dxl_id}] Retry reading Drive Mode")
+                        time.sleep(0.1)
+                
+                if drive_mode == RI.DXL_DRIVE_MODE_VELOCITY_BASED_PROFILE:
+                    # bit 2 OFF
+                    new_drive_mode = old_drive_mode & RI.DXL_DRIVE_MODE_VELOCITY_BASED_PROFILE_MASK
+                elif drive_mode == RI.DXL_DRIVE_MODE_TIME_BASED_PROFILE:
+                    # bit 2 ON
+                    new_drive_mode = old_drive_mode | RI.DXL_DRIVE_MODE_TIME_BASED_PROFILE_MASK
+                
+                while (self.write_drive_mode(dxl_id, new_drive_mode) != True):
+                    logging.warning(f"[DXL ID:{dxl_id}] Retry drive mode setting")
+                    time.sleep(0.1)
+                
+            # 5. Enable Torque mode
             while (self.write_torque_mode(dxl_id=dxl_id, torque_mode=RI.DXL_TORQUE_ENABLE) != True):
                 logging.warning(f"[DXL ID:{dxl_id}] Retry torque enable")
                 time.sleep(0.1)
@@ -951,7 +1233,16 @@ class Gripper:
     
     
     
-    def current_based_position_control_linear(self, dxl_id: int, current_ampere_mag: float=0.02, linear_pos: float=0.0) -> bool:
+    def current_based_position_control_linear(
+        self, 
+        dxl_id: int, 
+        current_ampere_mag: float=0.02, 
+        linear_pos: float=0.0, 
+        command_time_return=False,
+        time_profile_used=False,
+        profile_acceleration_ms: int = None,
+        profile_velocity_ms: int = None,
+    ):
         """
             Move gripper using linear position.
             MUST Use "Current-based Position Control Mode(5)" of Grippers
@@ -965,6 +1256,14 @@ class Gripper:
             linear_pos:
                 0.0  -> closed
                 91.0 -> open
+                
+            command_time_return:
+                If it is True, save the "command_time" to "self.command_time"
+                
+            time_profile_used:
+                If it is True, use Drive Mode(10) - Time-based Profile 
+                It uses Profile Acceleration(108) and Profile Velocity(102) with time[msec] unit
+                Make sure that the Drive Mode(10) is set as "Time-based Profile" mode (Bit index 2 should be 1) 
                 
             [Ex]
                 gripper.current_based_position_control_linear(ysw.GRIPPER_ID_R, 0.02, 0.0)   # close
@@ -1012,7 +1311,36 @@ class Gripper:
         current_A_abs = max(0.0, min(current_A_abs, RI.DXL_CURRENT_LIMIT_MAX_A_YSW)) 
         self.write_current_ampere(dxl_id, current_A_abs)
         
+        # 4. (optional) Set Time-based Profile
+        # In Time-based Profile:
+        #   Profile Acceleration(108) = acceleration time [ms]
+        #   Profile Velocity(112)     = total profile time [ms]
+        if time_profile_used:
+            if profile_acceleration_ms is not None:
+                profile_acceleration_ms = int(profile_acceleration_ms)
+
+                if profile_acceleration_ms < 0:
+                    logging.error("Profile Acceleration should be non-negative.")
+                    return False
+
+                if not self.write_profile_acceleration(dxl_id, profile_acceleration_ms):
+                    logging.error("Failed to write Profile Acceleration.")
+                    return False
+
+            if profile_velocity_ms is not None:
+                profile_velocity_ms = int(profile_velocity_ms)
+
+                if profile_velocity_ms < 0:
+                    logging.error("Profile Velocity should be non-negative.")
+                    return False
+
+                if not self.write_profile_velocity(dxl_id, profile_velocity_ms):
+                    logging.error("Failed to write Profile Velocity.")
+                    return False
+        
         # 4. Set Goal Position
+        if command_time_return:
+            self.command_time = time.perf_counter()
         if (self.write_goalPosition_tick(dxl_id=dxl_id, goalPos_tick=desired_pos_tick)):
             UTIL.print_end_title(f"Gripper [DXL ID:{dxl_id}] Current-based Position Control Ends")
             return True
@@ -1136,41 +1464,40 @@ def trapezoidal_position_control(
     gripper,
     dxl_id,
     target_pos_mm,
-    move_time,
     current_ampere_mag=0.02,
-    v_max=40.0,      # [mm/s]
-    a_max=50.0,      # [mm/s^2]
-    dt=0.01,         # [sec], 100Hz
-    pos_tol=1.0,     # [mm]
-    max_time=10.0,   # [sec]
+    v_max=40.0,             # [mm/s]
+    a_max=50.0,             # [mm/s^2]
+    dt=0.01,                # [sec], 100Hz
+    trajectory_time=3.0,    # [sec], total profile time
     plot=True,
 ):
     """
-        Time-based trapezoidal trajectory generation and position control.
+        Time-based trapezoidal position control.
         
-        x0 -> target_pos_mm까지 move_time초 동안 이동하도록
-        trapezoidal velocity profile을 먼저 설계하고,
-        그에 따라 position command x_cmd(t)를 생성해서 gripper에 보냄.
+        Current actual position is read once at the beginning.
+        Then a trapezoidal/triangular velocity profile is generated so that
 
-        x     : commanded position [mm]
-        v     : commanded velocity [mm/s]
-        a     : commanded acceleration [mm/s^2]
+            start_pos_mm -> target_pos_mm
 
-        start_pos_mm  -> target_pos_mm 로 이동하면서
+        is completed exactly in trajectory_time seconds.
+
+        Constraints:
             |v| <= v_max
             |a| <= a_max
-        를 만족하도록 중간 position command를 계속 보냄.
-        
+
+        If the requested trajectory_time is too short to satisfy these limits,
+        the function returns False.
+
         Return:
-            True  : target reached
-            False : failed or timeout
+            True
+                Trajectory command completed successfully.
+
+            False
+                Invalid/infeasible trajectory or communication failure.
     """
     
     def plot_trapezoidal_profile():
-        if not plot:
-            return
-
-        if len(t_cmd_list) == 0:
+        if not plot or len(t_cmd_list) == 0:
             return
 
         t_cmd = np.array(t_cmd_list)
@@ -1209,170 +1536,417 @@ def trapezoidal_position_control(
         plt.show()
         
         
-    # Read start position
+    # ============================================================
+    # 1. Check parameters
+    # ============================================================
+
+    target_pos_mm = float(target_pos_mm)
+    trajectory_time = float(trajectory_time)
+
+    v_max = abs(float(v_max))
+    a_max = abs(float(a_max))
+    dt = float(dt)
+
+    if trajectory_time <= 0.0:
+        raise ValueError("trajectory_time must be positive.")
+    
+    if v_max <= 0.0:
+        raise ValueError("v_max must be positive.")
+
+    if a_max <= 0.0:
+        raise ValueError("a_max must be positive.")
+
+    if dt <= 0.0:
+        raise ValueError("dt must be positive.")
+        
+        
+    # ============================================================
+    # 2. Read ACTUAL start position
+    # ============================================================
     start_pos_mm = gripper.read_position(
         dxl_id=dxl_id,
         unit=RI.MM,
         homing_use=True,
-        print_log=False,
+        verbose=False,
     )
-    
+
     if start_pos_mm is None:
-        logging.error(f"Failed to read gripper position. dxl_id={dxl_id}")
+        logging.error(
+            f"Failed to read gripper position. "
+            f"dxl_id={dxl_id}"
+        )
         return False
-    
-    x = float(start_pos_mm)
-    target_pos_mm = float(target_pos_mm)
-    
-    v = 0.0
-    a = 0.0
-    start_time = time.time()
-    
-    v_max = abs(float(v_max))
-    a_max = abs(float(a_max))
-    dt = float(dt)
-    
-    # For Safety
-    if v_max <= 0.0:    raise ValueError("v_max must be positive.")
-    if a_max <= 0.0:    raise ValueError("a_max must be positive.")
-    if dt <= 0.0:       raise ValueError("dt must be positive.")
-    
-    # Data for plotting
-    t_cmd_list = [0.0]
-    x_cmd_list = [x]
-    v_cmd_list = [v]
-    a_cmd_list = [a]
-    
-    print(f"[Gripper Trapezoidal profile] start={x:.2f} mm -> target={target_pos_mm:.2f} mm")
-    
-    while True:
-        elapsed = time.time() - start_time
+
+    start_pos_mm = float(start_pos_mm)
+
+    displacement = target_pos_mm - start_pos_mm
+    distance = abs(displacement)
+
+    # direction:
+    # +1 : opening direction
+    # -1 : closing direction
+    if displacement > 0.0:
+        direction = 1.0
+    elif displacement < 0.0:
+        direction = -1.0
+    else:
+        direction = 0.0
+
+    print(
+        f"[Gripper Trapezoidal Profile]\n"
+        f"  start            = {start_pos_mm:.3f} mm\n"
+        f"  target           = {target_pos_mm:.3f} mm\n"
+        f"  distance         = {distance:.3f} mm\n"
+        f"  trajectory_time  = {trajectory_time:.3f} sec"
+    )        
+
         
-        # Timeout check 
-        if elapsed > max_time:
-            logging.error("trapezoidal_position_command timeout.")
-            plot_trapezoidal_profile()
-            return False
-        
-        # Remaining distance
-        error = target_pos_mm - x
-        
-        # Terminate condition
-        if abs(error) <= pos_tol and abs(v) <= vel_tol:
-            x = target_pos_mm
-            v = 0.0
-            a = 0.0
-            
-            elapsed = time.time() - start_time
-            
-            t_cmd_list.append(elapsed)
-            x_cmd_list.append(x)
-            v_cmd_list.append(v)
-            a_cmd_list.append(a)
-            
-            rv = gripper.current_based_position_control_linear(
-                dxl_id,
-                current_ampere_mag=current_ampere_mag,
-                linear_pos=x
-            )
-            
-            if rv is False:
-                logging.error("Failed to send final gripper command")
-                plot_trapezoidal_profile()
-                return False
-        
-            time.sleep(0.2)
-            
-            # 실제 위치 확인
-            actual_pos_mm = gripper.read_position(
-                dxl_id=dxl_id,
-                unit=RI.MM,
-                homing_use=True,
-                print_log=False,
-            )
-            
-            if actual_pos_mm is None:
-                logging.error("Failed to read final gripper position")
-                plot_trapezoidal_profile()
-                return False
-            
-            actual_error = target_pos_mm - actual_pos_mm
-            
-            print(
-                f"[Gripper Trapezoid Done] "
-                f"target={target_pos_mm:.2f} mm, "
-                f"actual={actual_pos_mm:.2f} mm, "
-                f"error={actual_error:.2f} mm"
-            )
-            
-            plot_trapezoidal_profile()
-            
-            if abs(actual_error) <= pos_tol:
-                return True
-            else:
-                logging.info("Command finished, but actual position is not close enough.")
-                return False
-
-        # -------------------------------------------------
-        # Trajectory Generator
-        # -------------------------------------------------
-        direction_to_goal = sign(error)
-        velocity_direction = sign(v)                    # 현재 움직이는 방향
-        stopping_distance = (v**2) / (2.0 * a_max)      # 현재 속도로부터 필요한 stopping distance
-        
-        # 1. 목표 반대 방향으로 움직이고 있다면 먼저 감속
-        if velocity_direction != 0.0 and velocity_direction != direction_to_goal:
-            a = -velocity_direction * a_max
-
-        # 2. 이제 braking을 시작해야 할 경우
-        elif abs(error) <= stopping_distance:
-            if velocity_direction != 0.0:
-                a = -velocity_direction * a_max
-            else:
-                a = 0.0
-
-        # 3. 아직 충분한 거리가 남음 -> 가속
-        else:
-            if abs(v) < v_max:
-                a = direction_to_goal * a_max
-            else:
-                a = 0.0
-
-        # velocity update
-        v_new = v + a * dt
-        v_new = max(-v_max, min(v_max, v_new))      # velocity saturation
-
-        # position update
-        x_new = x + 0.5 * (v + v_new) * dt
-
-        # 목표를 지나쳐버리는 numerical overshoot 방지
-        if (target_pos_mm - x) * (target_pos_mm - x_new) < 0.0:
-            x_new = target_pos_mm
-            v_new = 0.0
-            a = 0.0
-
-        x = x_new
-        v = v_new
-        
-        elapsed = time.time() - start_time
-
-        t_cmd_list.append(elapsed)
-        x_cmd_list.append(x)
-        v_cmd_list.append(v)
-        a_cmd_list.append(a)
-
-        # -------------------------------------------------
-        # Dynamixel command
-        # -------------------------------------------------
+    # ============================================================
+    # 3. Already at target
+    # ============================================================
+    if distance < 1e-9:
         rv = gripper.current_based_position_control_linear(
             dxl_id,
             current_ampere_mag=current_ampere_mag,
-            linear_pos=x
+            linear_pos=target_pos_mm,
         )
+        return rv    
+    
+
+    # ============================================================
+    # 4. Generate profile parameters
+    # ============================================================
+    #
+    # Symmetric trajectory:
+    #
+    #   acceleration      constant velocity      deceleration
+    #
+    #        /--------\
+    #       /          \
+    # -----/            \-----
+    #
+    #
+    # t_acc   : acceleration time
+    # t_const : constant velocity time
+    # t_acc   : deceleration time
+    #
+    # trajectory_time = 2*t_acc + t_const
+    #
+    # distance = v_peak * (trajectory_time - t_acc)
+    #
+    # ============================================================
+
+    # ------------------------------------------------------------
+    # First try a triangular profile
+    # ------------------------------------------------------------
+    #
+    #       /\
+    #      /  \
+    # ----    ----
+    #
+    # t_acc = T/2
+    #
+    # distance = 1/2 * T * v_peak
+    #
+    # therefore
+    #
+    # v_peak = 2*distance / T
+    #
+    # ------------------------------------------------------------
+
+    triangular_peak_velocity = (2.0 * distance / trajectory_time)    
+    
+    # [Case 1]: triangular profile is possible within v_max
+    if triangular_peak_velocity <= v_max:
+        t_acc = trajectory_time / 2.0
+        t_const = 0.0
+
+        v_peak = triangular_peak_velocity
+        a_profile = v_peak / t_acc
+        
+        profile_type = "Triangular"
+        
+    # [Case 2]: v_max is reached -> trapezoidal profile
+    else:
+        v_peak = v_max
+
+        # distance = v_peak * (T - t_acc)
+        # therefore, t_acc = T - distance / v_peak
+
+        t_acc = (trajectory_time - distance / v_peak)
+
+        if t_acc <= 0.0:
+            logging.error("Requested trajectory_time is too short for the given v_max.")
+            return False
+
+        t_const = (trajectory_time - 2.0 * t_acc)
+
+        if t_const < -1e-9:
+            logging.error("Invalid trapezoidal profile.")
+            return False
+
+        # numerical protection
+        t_const = max(0.0, t_const)
+        a_profile = v_peak / t_acc
+        
+        profile_type = "Trapezoidal"
+
+
+    # ============================================================
+    # 5. Check acceleration constraint
+    # ============================================================
+    if a_profile > a_max + 1e-9:
+        logging.error(
+            f"Requested move_time   = {trajectory_time:.3f} sec is too short.\n"
+            f"Required acceleration = {a_profile:.3f} mm/s²\n"
+            f"a_max                 = {a_max:.3f} mm/s²"
+        )
+        return False
+
+    # Distances of each section
+    d_acc   = (0.5 * a_profile * t_acc**2)
+    d_const = (v_peak * t_const)
+
+    print(
+        f"  profile      = {profile_type}\n"
+        f"  t_acc        = {t_acc:.3f} sec\n"
+        f"  t_const      = {t_const:.3f} sec\n"
+        f"  t_dec        = {t_acc:.3f} sec\n"
+        f"  peak velocity= {v_peak:.3f} mm/s\n"
+        f"  acceleration = {a_profile:.3f} mm/s²"
+    )
+
+
+    # ============================================================
+    # 6. Data for plotting
+    # ============================================================
+    t_cmd_list = []
+    x_cmd_list = []
+    v_cmd_list = []
+    a_cmd_list = []
+
+    # ============================================================
+    # 7. Trajectory generator function
+    # ============================================================
+    def calculate_command(t):
+        # --------------------------------------------------------
+        # Phase 1: acceleration
+        # --------------------------------------------------------
+        if t < t_acc:
+            s = (0.5 * a_profile* t**2)
+            v = (a_profile * t)
+            a = a_profile
+
+        # --------------------------------------------------------
+        # Phase 2: constant velocity
+        # --------------------------------------------------------
+        elif t < t_acc + t_const:
+            t_local = (t - t_acc)
+            s = (d_acc + v_peak * t_local)
+            v = v_peak
+            a = 0.0
+
+        # --------------------------------------------------------
+        # Phase 3: deceleration
+        # --------------------------------------------------------
+        elif t < trajectory_time:
+            t_local = (t - t_acc - t_const)
+            s = (
+                d_acc 
+                + d_const
+                + v_peak * t_local
+                - 0.5 * a_profile * t_local**2
+            )
+            v = (v_peak - a_profile * t_local)
+            a = -a_profile
+
+        # --------------------------------------------------------
+        # Final point
+        # --------------------------------------------------------
+        else:
+            s = distance
+            v = 0.0
+            a = 0.0
+
+        x = (start_pos_mm + direction * s)
+        v = direction * v
+        a = direction * a
+
+        return x, v, a
+
+
+    # ============================================================
+    # 8. Execute trajectory
+    # ============================================================
+    trajectory_start_time = time.perf_counter()
+
+    # Desired sample times
+    t_samples = np.arange(0.0, trajectory_time, dt)
+
+    # Ensure exact final point t = trajectory_time
+    t_samples = np.append(t_samples, trajectory_time)
+    
+    # Timing check
+    command_start_time_list = []
+    command_duration_list = []
+    lateness_list = []
+
+    previous_command_start_time = None
+    actual_dt_list = []
+
+    for t_cmd in t_samples:
+        # Wait until scheduled command time
+        target_time = (trajectory_start_time + t_cmd)
+        sleep_time  = (target_time - time.perf_counter())
+
+        if sleep_time > 0.0:
+            time.sleep(sleep_time)
+            
+        # Actual command start time
+        command_start_time = time.perf_counter()
+
+        # 예정 시간보다 얼마나 늦었는지
+        lateness = command_start_time - target_time
+
+        command_start_time_list.append(command_start_time - trajectory_start_time)
+        lateness_list.append(lateness)
+
+        # 실제 command-to-command interval
+        if previous_command_start_time is not None:
+            actual_dt = command_start_time - previous_command_start_time
+            actual_dt_list.append(actual_dt)
+
+        previous_command_start_time = command_start_time    
+
+        # Generate commanded state
+        x_cmd, v_cmd, a_cmd = calculate_command(t_cmd)
+
+        # Save commanded trajectory
+        t_cmd_list.append(t_cmd)
+        x_cmd_list.append(x_cmd)
+        v_cmd_list.append(v_cmd)
+        a_cmd_list.append(a_cmd)
+
+        # Send position reference
+        send_start_time = time.perf_counter()
+        
+        rv = gripper.current_based_position_control_linear(
+            dxl_id,
+            current_ampere_mag=current_ampere_mag,
+            linear_pos=x_cmd,
+        )
+        
+        send_end_time = time.perf_counter()
+        
+        command_duration = send_end_time - send_start_time
+        command_duration_list.append(command_duration)
+
         if rv is False:
             logging.error("Failed to send gripper position command")
+            plot_trapezoidal_profile()
+            return False
         
-        time.sleep(dt)
+        
+    # ============================================================
+    # Timing analysis
+    # ============================================================
+    if len(actual_dt_list) > 0:
+        actual_dt_arr = np.array(actual_dt_list)
+        command_duration_arr = np.array(command_duration_list)
+        lateness_arr = np.array(lateness_list)
+
+        actual_dt_mean = np.mean(actual_dt_arr)
+        actual_dt_std = np.std(actual_dt_arr)
+        actual_dt_max = np.max(actual_dt_arr)
+        actual_dt_min = np.min(actual_dt_arr)
+
+        command_duration_mean = np.mean(command_duration_arr)
+        command_duration_max = np.max(command_duration_arr)
+
+        lateness_max = np.max(lateness_arr)
+
+        # dt보다 실제 command 실행 시간이 긴 경우
+        command_overrun_count = np.sum(command_duration_arr > dt)
+
+        # 실제 command interval이 dt보다 10% 이상 긴 경우
+        deadline_miss_count = np.sum(actual_dt_arr > 1.1 * dt)
+
+        print(
+            "\n[Trajectory Timing Check]\n"
+            f"  requested dt          = {dt*1000:.3f} ms\n"
+            f"  requested frequency   = {1.0/dt:.2f} Hz\n"
+            f"\n"
+            f"  actual dt mean        = {actual_dt_mean*1000:.3f} ms\n"
+            f"  actual dt std         = {actual_dt_std*1000:.3f} ms\n"
+            f"  actual dt min         = {actual_dt_min*1000:.3f} ms\n"
+            f"  actual dt max         = {actual_dt_max*1000:.3f} ms\n"
+            f"\n"
+            f"  command duration mean = {command_duration_mean*1000:.3f} ms\n"
+            f"  command duration max  = {command_duration_max*1000:.3f} ms\n"
+            f"\n"
+            f"  max lateness          = {lateness_max*1000:.3f} ms\n"
+            f"  command overruns      = {command_overrun_count}\n"
+            f"  deadline misses       = {deadline_miss_count}"
+        )
+
+        # --------------------------------------------------------
+        # dt validity check
+        # --------------------------------------------------------
+        if command_duration_max >= dt:
+            logging.warning(
+                f"dt={dt*1000:.3f} ms is TOO SHORT. "
+                f"Maximum command execution time was "
+                f"{command_duration_max*1000:.3f} ms."
+            )
+        elif command_duration_max >= 0.8 * dt:
+            logging.warning(
+                f"dt={dt*1000:.3f} ms has little timing margin. "
+                f"Maximum command execution time was "
+                f"{command_duration_max*1000:.3f} ms."
+            )
+        elif deadline_miss_count > 0:
+            logging.warning(
+                f"Timing jitter detected: "
+                f"{deadline_miss_count} command intervals "
+                f"exceeded 110% of requested dt."
+            )
+        else:
+            print(
+                f"[Timing OK] dt={dt*1000:.3f} ms "
+                f"({1.0/dt:.1f} Hz) appears feasible."
+            )
+
+
+    # ============================================================
+    # 9. Read actual final position
+    # ============================================================
+    actual_pos_mm = gripper.read_position(
+        dxl_id=dxl_id,
+        unit=RI.MM,
+        homing_use=True,
+        verbose=False,
+    )
+
+    if actual_pos_mm is not None:
+        pos_error = (target_pos_mm - actual_pos_mm)
+
+        print(
+            f"[Gripper trapezoid position control is Done]\n"
+            f"  target         = {target_pos_mm:.3f} mm\n"
+            f"  actual         = {actual_pos_mm:.3f} mm\n"
+            f"  position error = {pos_error:.3f} mm"
+        )
+
+    else:
+        logging.warning("Failed to read final actual position")
+
+    # ============================================================
+    # 10. Plot
+    # ============================================================
+    plot_trapezoidal_profile()
+
+    return True    
+    
 
 
 def monitor_gripper_current(
@@ -1698,3 +2272,520 @@ def monitor_gripper_live(
         print(f"{signal.capitalize()} min      : {np.min(value_array):.4f} {unit}")
 
     return result
+
+
+
+# Check the Step Response of Gripper Position[mm] 
+def record_response_for_stepPositionReference(
+    gripper,
+    dxl_id,
+    target_pos_mm,
+    current_ampere_mag=0.02,
+    pre_record_sec=0.5,     # 명령 전 몇 초 동안 기록할지
+    sample_dt=0.01,         # position read period [sec]
+    settled_time=3.0,       # 1% error band 안에 이 시간만큼 머물면 완료
+    timeout_sec=5.0,        # 명령 후 최대 대기 시간
+    title="Gripper Position Step Response",
+    plot=True,
+):
+    """
+    Gripper position command를 보내기 전부터 read_position으로 데이터를 모으고,
+    step position reference에 대한 actual position response를 기록한 뒤 plot.
+
+    Ensure that this function is used in operation mode 5:
+        Current-based Position Control Mode
+
+    Step response metrics:
+        rise time     : 10% -> 90% 도달 시간
+        peak time     : 최대/최소 peak가 발생한 시간
+        overshoot     : target을 넘어간 양
+        settling time : target 기준 ±1% step amplitude band에 들어가서 유지되기 시작한 시간
+
+    Return:
+        result = {
+            "time": np.array(time_list),
+            "position": np.array(position_list),
+            "target_pos_mm": target_pos_mm,
+            "command_time": command_time,
+
+            "start_pos_mm": start_pos_mm,
+            "step_amplitude_mm": step_amplitude_mm,
+
+            "t_10_abs_sec": t_10_abs,
+            "t_90_abs_sec": t_90_abs,
+            "rise_time_sec": rise_time_sec,
+
+            "peak_time_abs_sec": peak_time_abs,
+            "peak_time_sec": peak_time_sec,
+            "peak_value_mm": peak_value_mm,
+
+            "overshoot_mm": overshoot_mm,
+            "overshoot_percent": overshoot_percent,
+
+            "settling_band_mm": settling_band_mm,
+            "settling_time_abs_sec": settling_time_abs,
+            "settling_time_sec": settling_time_sec,
+
+            "actual_final_pos_mm": actual_final_pos_mm,
+            "actual_error_mm": actual_error_mm,
+            "success": success,
+        }
+    """
+
+    def find_first_crossing_time(t_arr, y_arr, threshold, direction):
+        """
+        direction > 0: y가 threshold 이상이 되는 첫 시간
+        direction < 0: y가 threshold 이하가 되는 첫 시간
+        선형 보간으로 crossing time 계산
+        """
+        if len(t_arr) < 2:
+            return None
+
+        for i in range(1, len(t_arr)):
+            t0 = t_arr[i - 1]
+            t1 = t_arr[i]
+            y0 = y_arr[i - 1]
+            y1 = y_arr[i]
+
+            if direction > 0:
+                crossed = (y0 < threshold <= y1)
+            else:
+                crossed = (y0 > threshold >= y1)
+
+            if crossed:
+                if abs(y1 - y0) < 1e-12:
+                    return t1
+
+                ratio = (threshold - y0) / (y1 - y0)
+                return t0 + ratio * (t1 - t0)
+
+        return None
+
+    def compute_settling_time(t_arr, y_arr, target, band, command_time):
+        """
+        command 이후 데이터에서,
+        현재 시점 이후 모든 데이터가 target ± band 안에 들어오는 첫 시점을 찾음.
+        """
+        if len(t_arr) == 0:
+            return None, None
+
+        mask = t_arr >= command_time
+        t_after = t_arr[mask]
+        y_after = y_arr[mask]
+
+        if len(t_after) == 0:
+            return None, None
+
+        inside = np.abs(y_after - target) <= band
+
+        for i in range(len(t_after)):
+            if np.all(inside[i:]):
+                settling_time_abs = t_after[i]
+                settling_time = settling_time_abs - command_time
+                return settling_time_abs, settling_time
+
+        return None, None
+
+    def format_metric(value, unit="sec"):
+        if value is None:
+            return "None"
+        return f"{value:.4f} {unit}"
+
+    # -------------------------------------------------
+    # Initial setting
+    # -------------------------------------------------
+    target_pos_mm = float(target_pos_mm)
+
+    time_list = []
+    position_list = []
+
+    start_time = time.perf_counter()
+    next_sample_time = start_time
+
+    command_time = None
+    actual_final_pos_mm = None
+    actual_error_mm = None
+    success = False
+
+    print("[Gripper Position Step Response Recording] Starts")
+    print(f"  target position = {target_pos_mm:.2f} mm")
+    print(f"  current limit   = {current_ampere_mag:.4f} A")
+    print(f"  pre record time = {pre_record_sec:.2f} sec")
+
+    # -------------------------------------------------
+    # 1. Record before command
+    # -------------------------------------------------
+    while True:
+        now = time.perf_counter()
+        elapsed = now - start_time
+
+        if elapsed >= pre_record_sec:
+            break
+
+        actual_pos_mm = gripper.read_position(
+            dxl_id=dxl_id,
+            unit=RI.MM,
+            homing_use=True,
+            verbose=False,
+        )
+
+        if actual_pos_mm is not None:
+            time_list.append(elapsed)
+            position_list.append(actual_pos_mm)
+
+        next_sample_time += sample_dt
+        sleep_time = next_sample_time - time.perf_counter()
+
+        if sleep_time > 0.0:
+            time.sleep(sleep_time)
+        else:
+            next_sample_time = time.perf_counter()
+
+    # -------------------------------------------------
+    # Start position for step response
+    # -------------------------------------------------
+    if len(position_list) > 0:
+        start_pos_mm = float(position_list[-1])
+    else:
+        start_pos_mm = gripper.read_position(
+            dxl_id=dxl_id,
+            unit=RI.MM,
+            homing_use=True,
+            verbose=False,
+        )
+
+        if start_pos_mm is None:
+            logging.error("Failed to read start gripper position.")
+            return {
+                "time": np.array(time_list),
+                "position": np.array(position_list),
+                "target_pos_mm": target_pos_mm,
+                "success": False,
+            }
+
+        start_pos_mm = float(start_pos_mm)
+
+    step_amplitude_mm = target_pos_mm - start_pos_mm
+    step_amplitude_abs_mm = abs(step_amplitude_mm)
+
+    if step_amplitude_abs_mm < 1e-9:
+        logging.warning("Step amplitude is almost zero.")
+        settling_band_mm = 0.0
+        direction = 1.0
+    else:
+        settling_band_mm = 0.01 * step_amplitude_abs_mm
+        direction = 1.0 if step_amplitude_mm > 0.0 else -1.0
+
+    level_10_mm = start_pos_mm + 0.1 * step_amplitude_mm
+    level_90_mm = start_pos_mm + 0.9 * step_amplitude_mm
+
+    print(f"  start position = {start_pos_mm:.2f} mm")
+    print(f"  step amplitude = {step_amplitude_mm:.2f} mm")
+    print(f"  1% band        = ±{settling_band_mm:.4f} mm")
+
+    # -------------------------------------------------
+    # 2. Send position command
+    # -------------------------------------------------
+    rv = gripper.current_based_position_control_linear(
+        dxl_id=dxl_id,
+        current_ampere_mag=current_ampere_mag,
+        linear_pos=target_pos_mm,
+        command_time_return=True,   # Necessary
+    )
+
+    if rv is False:
+        logging.error("Failed to send gripper position command.")
+
+        result = {
+            "time": np.array(time_list),
+            "position": np.array(position_list),
+            "target_pos_mm": target_pos_mm,
+            "command_time": command_time,
+            "start_pos_mm": start_pos_mm,
+            "step_amplitude_mm": step_amplitude_mm,
+            "success": False,
+        }
+
+        return result
+    
+    # gripper.command_time은 time.perf_counter() 기준 absolute time
+    if getattr(gripper, "command_time", None) is not None:
+        command_time_abs = gripper.command_time
+    else:
+        logging.warning("gripper.command_time is None. Use current time instead.")
+        command_time_abs = time.perf_counter()
+
+    # plot/metric에 쓸 command_time은 start_time 기준 상대시간
+    command_time = command_time_abs - start_time
+
+    # command 시점의 start position을 한 점 추가
+    time_list.append(command_time)
+    position_list.append(start_pos_mm)
+
+    logging.info(f"Position command sent at t = {command_time:.3f} sec")
+
+    # -------------------------------------------------
+    # 3. Record until settled
+    # ------------------------------------------------- 
+    command_start_time = command_time_abs
+    settling_candidate_start_time = None
+    next_sample_time = time.perf_counter()
+
+    while True:
+        now = time.perf_counter()
+        elapsed = now - start_time
+        elapsed_after_command = now - command_start_time
+
+        if elapsed_after_command > timeout_sec:
+            logging.warning("Position recording timeout.")
+            break
+
+        actual_pos_mm = gripper.read_position(
+            dxl_id=dxl_id,
+            unit=RI.MM,
+            homing_use=True,
+            verbose=False,
+        )
+
+        if actual_pos_mm is not None:
+            time_list.append(elapsed)
+            position_list.append(actual_pos_mm)
+
+            actual_final_pos_mm = actual_pos_mm
+            actual_error_mm = target_pos_mm - actual_pos_mm
+
+            # 1% settling band 안에 들어왔는지 확인
+            if abs(actual_error_mm) <= settling_band_mm:
+                if settling_candidate_start_time is None:
+                    settling_candidate_start_time = now
+
+                # band 안에서 settled_time만큼 유지되면 완료
+                if now - settling_candidate_start_time >= settled_time:
+                    success = True
+                    break
+
+            else:
+                settling_candidate_start_time = None
+
+        next_sample_time += sample_dt
+        sleep_time = next_sample_time - time.perf_counter()
+
+        if sleep_time > 0.0:
+            time.sleep(sleep_time)
+        else:
+            next_sample_time = time.perf_counter()
+
+    # -------------------------------------------------
+    # 4. Compute response metrics
+    # -------------------------------------------------
+    t_arr = np.array(time_list, dtype=np.float64)
+    pos_arr = np.array(position_list, dtype=np.float64)
+
+    command_mask = t_arr >= command_time
+    t_after = t_arr[command_mask]
+    pos_after = pos_arr[command_mask]
+
+    t_10_abs = None
+    t_90_abs = None
+    rise_time_sec = None
+
+    peak_time_abs = None
+    peak_time_sec = None
+    peak_value_mm = None
+
+    overshoot_mm = None
+    overshoot_percent = None
+
+    settling_time_abs = None
+    settling_time_sec = None
+
+    if len(t_after) >= 2 and step_amplitude_abs_mm > 1e-9:
+        # Rise time: 10% -> 90%
+        t_10_abs = find_first_crossing_time(
+            t_after,
+            pos_after,
+            level_10_mm,
+            direction,
+        )
+
+        t_90_abs = find_first_crossing_time(
+            t_after,
+            pos_after,
+            level_90_mm,
+            direction,
+        )
+
+        if t_10_abs is not None and t_90_abs is not None:
+            rise_time_sec = t_90_abs - t_10_abs
+
+        # Peak time and overshoot
+        # 증가 step이면 max, 감소 step이면 min을 peak/extreme으로 사용
+        if direction > 0:
+            peak_idx = int(np.argmax(pos_after))
+            peak_value_mm = float(pos_after[peak_idx])
+            overshoot_mm = max(0.0, peak_value_mm - target_pos_mm)
+        else:
+            peak_idx = int(np.argmin(pos_after))
+            peak_value_mm = float(pos_after[peak_idx])
+            overshoot_mm = max(0.0, target_pos_mm - peak_value_mm)
+
+        peak_time_abs = float(t_after[peak_idx])
+        peak_time_sec = peak_time_abs - command_time
+        overshoot_percent = overshoot_mm / step_amplitude_abs_mm * 100.0
+
+        # Settling time
+        settling_time_abs, settling_time_sec = compute_settling_time(
+            t_arr,
+            pos_arr,
+            target_pos_mm,
+            settling_band_mm,
+            command_time,
+        )
+
+    # -------------------------------------------------
+    # 5. Result print
+    # -------------------------------------------------
+    if actual_final_pos_mm is not None:
+        actual_error_mm = target_pos_mm - actual_final_pos_mm
+
+        print(
+            f"[Gripper Position Step Response Done]\n"
+            f"  target              = {target_pos_mm:.2f} mm\n"
+            f"  actual final        = {actual_final_pos_mm:.2f} mm\n"
+            f"  final error         = {actual_error_mm:.2f} mm\n"
+            f"  success             = {success}\n"
+            f"\n"
+            f"  t_10                = {format_metric(None if t_10_abs is None else t_10_abs - command_time)}\n"
+            f"  t_90                = {format_metric(None if t_90_abs is None else t_90_abs - command_time)}\n"
+            f"  rise time           = {format_metric(rise_time_sec)}\n"
+            f"  peak time           = {format_metric(peak_time_sec)}\n"
+            f"  peak value          = {format_metric(peak_value_mm, 'mm')}\n"
+            f"  overshoot           = {format_metric(overshoot_mm, 'mm')}\n"
+            f"  overshoot percent   = {format_metric(overshoot_percent, '%')}\n"
+            f"  settling band       = ±{settling_band_mm:.4f} mm\n"
+            f"  settling time       = {format_metric(settling_time_sec)}"
+        )
+    else:
+        logging.error("No valid position data after command.")
+
+    result = {
+        "time": t_arr,
+        "position": pos_arr,
+        "target_pos_mm": target_pos_mm,
+        "command_time": command_time,
+
+        "start_pos_mm": start_pos_mm,
+        "step_amplitude_mm": step_amplitude_mm,
+
+        "t_10_abs_sec": t_10_abs,
+        "t_90_abs_sec": t_90_abs,
+        "rise_time_sec": rise_time_sec,
+
+        "peak_time_abs_sec": peak_time_abs,
+        "peak_time_sec": peak_time_sec,
+        "peak_value_mm": peak_value_mm,
+
+        "overshoot_mm": overshoot_mm,
+        "overshoot_percent": overshoot_percent,
+
+        "settling_band_mm": settling_band_mm,
+        "settling_time_abs_sec": settling_time_abs,
+        "settling_time_sec": settling_time_sec,
+
+        "actual_final_pos_mm": actual_final_pos_mm,
+        "actual_error_mm": actual_error_mm,
+        "success": success,
+    }
+
+    # -------------------------------------------------
+    # 6. Plot
+    # -------------------------------------------------
+    if plot and len(position_list) > 0:
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        ax.plot(
+            t_arr, 
+            pos_arr, 
+            label="actual position [mm]", 
+            color="blue", 
+            linewidth=2.0
+        )
+
+        # target position
+        ax.axhline(
+            target_pos_mm,
+            color="red",
+            linestyle="--",
+            linewidth=1.5,
+            label=f"target position = {target_pos_mm:.2f} mm",
+        )
+
+        # command time
+        if command_time is not None:
+            ax.axvline(
+                command_time,
+                color="green",
+                linestyle="--",
+                linewidth=1.5,
+                label=f"command sent = {command_time:.3f} sec",
+            )
+
+        # settling band
+        if settling_band_mm > 0.0:
+            ax.axhline(
+                target_pos_mm + settling_band_mm,
+                color="black",
+                linestyle=":",
+                linewidth=1.2,
+                label="+1% settling band",
+            )
+
+            ax.axhline(
+                target_pos_mm - settling_band_mm,
+                color="black",
+                linestyle=":",
+                linewidth=1.2,
+                label="-1% settling band",
+            )
+            
+        # -------------------------------------------------
+        # Metric label only
+        # -------------------------------------------------
+        metric_text = (
+            "Step response metrics\n"
+            f"Rise time          : {format_metric(rise_time_sec)}\n"
+            f"Peak time          : {format_metric(peak_time_sec)}\n"
+            f"Peak value         : {format_metric(peak_value_mm, 'mm')}\n"
+            f"Overshoot          : {format_metric(overshoot_mm, 'mm')}\n"
+            f"Overshoot percent  : {format_metric(overshoot_percent, '%')}\n"
+            f"Settling band      : ±{settling_band_mm:.4f} mm\n"
+            f"Settling time      : {format_metric(settling_time_sec)}"
+        )
+
+        ax.text(
+            0.98,
+            0.02,
+            metric_text,
+            transform=ax.transAxes,
+            fontsize=11,
+            verticalalignment="bottom",
+            horizontalalignment="right",
+            bbox=dict(
+                boxstyle="round",
+                facecolor="white",
+                alpha=0.85,
+            ),
+        )
+
+        ax.set_xlabel("Time [sec]")
+        ax.set_ylabel("Position [mm]")
+        ax.set_title(title)
+        ax.grid(True)
+        ax.legend(loc="center right")
+        plt.tight_layout()
+        plt.show()
+
+    return result
+
+
+
